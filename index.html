@@ -22,6 +22,22 @@
                 animation-timing-function: ease-in;
                 animation-duration: 2s;
             }
+            #middlewrapper {
+                display: flex;
+                border: 3px solid black;
+                border-top: 1px solid black;
+                width: fit-content;
+                text-align: center;
+                animation-name: fadeInOpacity;
+                animation-iteration-count: 1;
+                animation-timing-function: ease-in;
+                animation-duration: 2s;
+            }  
+            #bargraph {
+                padding-top: 6px;
+                display: inline-block;
+                text-align: center;
+            }
             
             @keyframes fadeInOpacity {
                 0% {
@@ -48,6 +64,14 @@
         }
     }
     
+    // Global variables
+    var container_dimensions = {width: 650, height: 400}; // width: 650
+    var margins = {top: 20, right: 20, bottom: 40, left: 45};
+    var chart_dimensions = {
+            width: container_dimensions.width - margins.left - margins.right,
+            height: container_dimensions.height - margins.top - margins.bottom
+    };
+    var barSize = 30;
     showActiveDrivers = true; // Flag that indicates to show only active drivers
     activeDrivers = []; // List of drivers loaded by the data that are active
     retiredDrivers = []; // List of drivers loaded by the data that are retired
@@ -132,6 +156,8 @@
                 activeDrivers = []; // Will Contain all active drivers inside the csv file
                 retiredDrivers = []; // Will contain all retired drivers inside the csv file
                 data.forEach(function(d) { // Cycles through the data
+                    d.surname = d.surname.replace(/[\s.']/g, '_'); // Removes eventual spaces in the surnames
+                    d.name = d.name.replace(/[\s.']/g, '_'); // Removes eventual spaces in the names
                     driver = new Driver(d.surname, d.name);
                     if (d.year == 2019 && !contains(activeDrivers, driver)) {
                         activeDrivers.push(driver);
@@ -144,9 +170,18 @@
                         retiredDrivers.push(driver);
                     }
                 });
-             
-                console.log(activeDrivers);
-                console.log(retiredDrivers);
+                activeDrivers.sort(function(a, b){
+                    if(a.surname < b.surname) { return -1; }
+                    if(a.surname > b.surname) { return 1; }
+                    return 0;
+                });
+                retiredDrivers.sort(function(a, b){
+                    if(a.surname < b.surname) { return -1; }
+                    if(a.surname > b.surname) { return 1; }
+                    return 0;
+                });
+                //console.log(activeDrivers);
+                //console.log(retiredDrivers);
                 addDriversToTitle(); // Adds the events to the user's selections in the title now that the data is loaded
                 enableInputsToTitle(data);
             }
@@ -208,15 +243,156 @@
             if (showActiveDrivers) {
                 surname = activeDrivers[value-1].surname;
                 name = activeDrivers[value-1].name;
-                alert("I've selected " + surname + " " + name + "!");
+                plotPointsAchieved(data, surname, name);
             }
             else {
                 surname = retiredDrivers[value-1].surname;
                 name = retiredDrivers[value-1].name;
-                alert("I've selected " + surname + " " + name + "!");
+                plotPointsAchieved(data, surname, name);
             }
         }    
     }
+    
+    // Plot a bar graph that shows the points achieved by the driver season by season
+    function plotPointsAchieved(data, surname, name) {
+        // Removes the previous graph and option screen
+        previousGraph = document.getElementById("middlewrapper");
+        if (document.body.contains(previousGraph)) {
+            previousGraph.remove();
+        }
+    
+        // Finds the relevant data to plot
+        relevantData = findPointsAchieved(data, surname, name);
+        console.log(relevantResults);   
+        
+        // Initializes the wrapper and the empty svg area
+        wrapper = document.createElement('div');
+        wrapper.id = "middlewrapper";
+        document.body.append(wrapper);
+        
+        svgDiv = document.createElement('div');
+        svgDiv.id = "bargraph";
+        // svgDiv.innerHTML = "Points Achieved";
+        wrapper.append(svgDiv);
+        
+        svg = d3.select('#bargraph')
+            .append('svg')
+                .attr("width", container_dimensions.width)
+                .attr("height", container_dimensions.height)
+                //.style("background-color", "red")
+            .append("g")
+                .attr("transform", "translate(" + margins.left + "," + margins.top + ")")
+                .attr("id", "bargraph");
+        
+        // Initializes the scales and colors
+        minYear = relevantData[0].key;
+        maxYear = relevantData[relevantData.length-1].key;
+        x = d3.scaleBand()
+            .domain(relevantData.map(function(d) {
+                return d.key;
+            }))
+            .range([0, chart_dimensions.width])
+            .padding(.5);
+        
+        /*
+        maxPoints = 0;
+        for (i = 0; i < relevantData.length; i++) {
+            points = relevantData[i].value.totalPoints;
+            if (points > maxPoints) {
+                maxPoints = points;
+            }
+        }     
+        y = d3.scaleLinear()
+            .domain([maxPoints, 0])
+            .range([0, chart_dimensions.height]);
+        
+        colors = d3.scaleOrdinal(d3.schemeCategory20);
+        
+        // Initializes the axis
+        xAxis= d3.axisBottom(x).ticks().tickFormat(d3.format("d"));
+        yAxis= d3.axisLeft(y).ticks().tickFormat(d3.format("d"));
+        
+        // Appends the x axis
+        svg.append("g")
+            .attr("class","x_axis")
+            .attr("transform", "translate(0,"+(chart_dimensions.height+1)+")")
+            .call(xAxis);
+        svg.append("text")
+            .attr("class","label")
+            .attr("x", chart_dimensions.width)
+            .attr("y", chart_dimensions.height+(margins.bottom-10))
+            .style("text-anchor","end")
+            .text("Seasons");
+        
+        // Appends the y axis
+        svg.append("g")
+            .attr("class","y_axis")
+            .call(yAxis)
+        svg.append("text")
+            .attr("class","label")
+            .attr("transform","rotate(-90)")
+            .attr("y", 6)
+            .attr("dy","-2.1em")
+            .style("text-anchor","end")
+            .text("Points");
+       
+        console.log(relevantData);
+        // Draws the bars
+        svg.selectAll("bar")
+            .data(relevantData)
+            .enter()
+            .append("rect")
+                .style("fill", "steelblue")
+                .attr("x", function(d) { 
+                    return x(d.key); 
+                })
+                .attr("width", x.bandwidth)
+                .attr("y", function(d) { 
+                    return y(d.value.totalPoints); 
+                })
+                .attr("height", function(d) { 
+                    return chart_dimensions.height - y(d.value.totalPoints); 
+                }); */
+    }
+    
+    // Finds the points achieved by a driver season by season
+    function findPointsAchieved(data, surname, name) {
+        // Groups all the results by pilot
+        groupedResults = d3.nest()
+            .key(function(d) {
+                return d.surname + "_" + d.name;
+            })
+            .entries(data);
+
+        // Finds the results of the selected pilot
+        relevantResults = [];
+        for (i = 0; i < groupedResults.length; i++) {
+            driverResults = groupedResults[i];
+            if (driverResults.key == surname + "_" + name) {
+                relevantResults = driverResults.values;
+            }
+        }
+        
+        // Groups the relevant results by year and finds the total number of points by year
+        relevantResults = d3.nest()
+            .key(function(d) {
+                return d.year;
+            })
+            .key(function(d) {
+                return d.constructor;
+            })
+            .rollup(function(d) {
+                return {
+                    totalPoints: d3.sum(d, function(g) {
+                        return g.points;
+                    })
+                }
+             })
+            .entries(relevantResults);
+        
+        return relevantResults;
+    }
+        
                        
     drawTitle();
     </script>
