@@ -11,9 +11,26 @@
             }
             #title {
                 border: 3px solid black;
+                width: 435px;
                 padding-left: 5px;
                 padding-right: 5px;
                 padding-bottom: 5px;
+                display: inline-block;
+                background: yellow;
+                text-align: center;
+                animation-name: fadeInOpacity;
+                animation-iteration-count: 1;
+                animation-timing-function: ease-in;
+                animation-duration: 2s;
+            }
+             #menu {
+                border: 3px solid black;
+                width: 435px;
+                border-left: none;
+                padding-left: 5px;
+                padding-right: 5px;
+                padding-bottom: 5px;
+                padding-top: 10px;
                 display: inline-block;
                 background: yellow;
                 text-align: center;
@@ -104,9 +121,15 @@
         title = document.createElement('div');
         title.id = "title";
         title.innerHTML = "<h1>Formula 1 Driver Analyzer</h1>";
+        aboveWrapper.appendChild(title);   
+        
+        // Creates the div 'menu' which allows the user to select a driver
+        menu = document.createElement('div');
+        menu.id = "menu";
+        aboveWrapper.appendChild(menu);
         
         // Adds radios button in order to distinguish between active and retired drivers
-        title.innerHTML += "Choose between drivers that are: ";
+        menu.innerHTML += "Choose between drivers that are: ";
         activeButton = document.createElement('input');
         activeButton.type = 'radio';
         activeButton.name = 'drivers';
@@ -114,9 +137,9 @@
         activeButton.value = "active";
         label = document.createElement('label');
         label.innerHTML = "Active";
-        title.appendChild(activeButton);
-        title.appendChild(label);
-        title.innerHTML += "   ";
+        menu.appendChild(activeButton);
+        menu.appendChild(label);
+        menu.innerHTML += "   ";
         
         retiredButton = document.createElement('input');
         retiredButton.type = 'radio';
@@ -125,28 +148,32 @@
         retiredButton.value = "retired";
         label = document.createElement('label');
         label.innerHTML = "Retired";
-        title.appendChild(retiredButton);
-        title.appendChild(label);
-        title.innerHTML += "<br>";
+        menu.appendChild(retiredButton);
+        menu.appendChild(label);
+        menu.innerHTML += "<br>";
         
         // Creates a selection for the drivers with a default option, and adds it to 'title'
-        title.innerHTML += "Please select a driver: ";
-        aboveWrapper.appendChild(title);   
+        menu.innerHTML += "Please select a driver: ";
+
         selectDriver = document.createElement('select');
         selectDriver.id = "select-driver";
         defaultDriverOption = document.createElement('option');
         defaultDriverOption.value = 0;
         defaultDriverOption.innerHTML = "- DRIVER -";
         selectDriver.appendChild(defaultDriverOption);
-        title.appendChild(selectDriver);
-        title.innerHTML += "<br>";
+        menu.appendChild(selectDriver);
+        menu.innerHTML += "<br>";
         
          // Creates the search button, makes it disabled and adds it to 'title'
-        search = document.createElement('button');
-        search.id = "search";
-        search.innerHTML = "Search data!";
-        search.disabled = true;
-        title.appendChild(search);
+        searchButton = document.createElement('button');
+        searchButton.id = "search";
+        searchButton.innerHTML = "Search data!";
+        searchButton.disabled = true;
+        menu.appendChild(searchButton);
+        
+        about = document.createElement('div');
+        about.id = "menu";
+        aboveWrapper.appendChild(about);
         
         document.getElementById("active-drivers").checked = true; 
         loadData();
@@ -352,13 +379,14 @@
             year = relevantData[i].key;
             for (j = 0; j < relevantData[i].values.length; j++) { // Cycles through the constructors per year
                 constructor = relevantData[i].values[j].key;
-                if (!constructors.includes(constructor)) {
+                if (!constructors.includes(constructor) && relevantData[i].values[j].value.totalPoints > 0) { // Filters out constructors with zero points
+                    console.log(relevantData[i].values[j].value.totalPoints);
                     constructors.push(constructor);
                 } 
                 if (j > 0) { // Check if there's a bar below (aka a constructor change in the season) and if so, it takes its measures
                     barBelowY = relevantData[i].values[j-1].value.totalPoints;
                 }
-                svg.selectAll("bar")
+                bar = svg.selectAll("bar")
                     .data([relevantData[i].values[j].value]) // The [ ] parenthesis turn the object in an array
                     .enter()
                     .append("rect")
@@ -368,66 +396,74 @@
                         })
                         .attr("x", x(year)) 
                         .attr("width", x.bandwidth)
-                        .attr("y", function(d) { 
-                            if (j > 0) { // If there's a bar below, stack the new bar above it
-                                return y(d.totalPoints + barBelowY);
-                            }
-                            return y(d.totalPoints); 
-                        })
-                        .attr("height", function(d) { 
-                            if (j > 0) {
-                                return y(barBelowY) - y(d.totalPoints+barBelowY);
-                            }
-                            return chart_dimensions.height - y(d.totalPoints); 
-                        })
-                        .on("mouseover", function(d) {
-                            console.log(d3.select(this).attr("class"));
-                            d3.select(this)
-                                .style("stroke", "black");
-                            coords = d3.mouse(this);
+                        .attr("y", y(0))
+                        .attr("height", 0);
+                 
+                // Handles inputs                 
+                bar.on("mouseover", function(d) {
+                    d3.select(this)
+                        .style("stroke", "black");
+                    coords = d3.mouse(this);
                             
-                            // Adds information about the points near the mouse location
-                            g = svg.append("g") // Each text label will be inside a black outlined rect in g
-                                .attr("class", "rect_label");
-                            classLength = d3.select(this).attr("class").length;
-                            constructor = d3.select(this).attr("class").substring(0, classLength-4);
-                            year = d3.select(this).attr("class").substring(classLength-4, classLength);
-                            text = "[Points: " + d.totalPoints + ", Constructor: " + constructor.replace(/_/g, ' ') + "]";
-                            rect = g.append('rect')
-                                .attr("width", text.length*7)
-                                .attr("height", 20)
-                                .attr("stroke", "black")
-                                .style("fill", "white"); 
+                    // Adds information about the points near the mouse location
+                    g = svg.append("g") // Each text label will be inside a black outlined rect in g
+                        .attr("class", "rect_label");
+                    classLength = d3.select(this).attr("class").length;
+                    constructor = d3.select(this).attr("class").substring(0, classLength-4);
+                    year = d3.select(this).attr("class").substring(classLength-4, classLength);
+                    text = "[Points: " + d.totalPoints + ", Constructor: " + constructor.replace(/_/g, ' ') + "]";
+                    rect = g.append('rect')
+                        .attr("width", text.length*7)
+                        .attr("height", 20)
+                        .attr("stroke", "black")
+                        .style("fill", "white"); 
                             
-                            // Checks if to place the information on the right or on the left of the mouse location
-                            if (parseInt(year) <= (parseInt(minYear)+ parseInt(maxYear))/2) {
-                                rect.attr("x", coords[0]+6)
-                                    .attr("y", coords[1]-30);
-                                g.append('text')
-                                    .attr("x", coords[0]+10)
-                                    .attr("y", coords[1]-15)
-                                    .attr("fill", colors(constructor))
-                                    .text(text);
-                            }
-                            else {
-                                rect.attr("x", coords[0]-200)
-                                    .attr("y", coords[1]-30);
-                                g.append('text')
-                                    .attr("x", coords[0]-196)
-                                    .attr("y", coords[1]-15)
-                                    .attr("fill", colors(constructor))
-                                    .text(text);      
-                            }              
-                        })
-                        .on("mouseout", function(d) {
-                            d3.select(this)
-                                .style("stroke", "none");
+                    // Checks if to place the information on the right or on the left of the mouse location
+                    if (parseInt(year) <= (parseInt(minYear)+ parseInt(maxYear))/2) {
+                        rect.attr("x", coords[0]+6)
+                            .attr("y", coords[1]-30);
+                        g.append('text')
+                            .attr("x", coords[0]+10)
+                            .attr("y", coords[1]-15)
+                            .attr("fill", colors(constructor))
+                            .text(text);
+                        }
+                        else {
+                            rect.attr("x", coords[0]-200)
+                                .attr("y", coords[1]-30);
+                             g.append('text')
+                                .attr("x", coords[0]-196)
+                                .attr("y", coords[1]-15)
+                                .attr("fill", colors(constructor))
+                                .text(text);      
+                        }              
+                    })
+                   
+                bar.on("mouseout", function(d) {
+                    d3.select(this)
+                        .style("stroke", "none");
                                 
-                            // Removes information about the points near the mouse location
-                            d3.select(".rect_label")
-                                .remove();
-                        });
-             }        
+                    // Removes information about the points near the mouse location
+                    d3.select(".rect_label")
+                        .remove();
+                });
+               
+                // Handles the animations
+                bar.transition()
+                    .duration(2000)
+                    .attr("y", function(d) { 
+                        if (j > 0) { // If there's a bar below, stack the new bar above it
+                            return y(d.totalPoints + barBelowY);
+                        }
+                        return y(d.totalPoints); 
+                    })
+                    .attr("height", function(d) { 
+                        if (j > 0) {
+                            return y(barBelowY) - y(d.totalPoints+barBelowY);
+                        }
+                        return chart_dimensions.height - y(d.totalPoints); 
+                    })
+            }        
         }
         
         // Draws the legend for the graph
@@ -460,8 +496,7 @@
         optionsDiv.appendChild(label);
         document.getElementById("total-points").checked = true;
     }
-    
-    
+        
     // Draws the legend for the points bar graph
     function plotPointsAchievedLegend(constructors) {
         // Initializes the empty svg area
@@ -544,7 +579,6 @@
             }); */
     }
         
-    
     // Finds the points achieved by a driver season by season
     function findPointsAchieved(data, surname, name) {
         // Groups all the results by pilot
