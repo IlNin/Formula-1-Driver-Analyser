@@ -1,0 +1,64 @@
+#abovewrapper {
+    width: fit-content;
+    display: flex;
+}
+#title {
+    border: 3px solid black;
+    width: 435px;
+    padding-left: 5px;
+    padding-right: 5px;
+    padding-bottom: 5px;
+    display: inline-block;
+    background: yellow;
+    text-align: center;
+    animation-name: fadeInOpacity;
+    animation-iteration-count: 1;
+    animation-timing-function: ease-in;
+    animation-duration: 2s;
+}
+#menu {
+    border: 3px solid black;
+    width: 435px;
+    border-left: none;
+    padding-left: 5px;
+    padding-right: 5px;
+    padding-bottom: 5px;
+    padding-top: 10px;
+    display: inline-block;
+    background: yellow;
+    text-align: center;
+    animation-name: fadeInOpacity;
+    animation-iteration-count: 1;
+    animation-timing-function: ease-in;
+    animation-duration: 2s;
+}
+#middlewrapper {
+    display: flex;
+    border: 3px solid black;
+    border-top: 1px solid black;
+    width: fit-content;
+    text-align: center;
+    animation-name: fadeInOpacity;
+    animation-iteration-count: 1;
+    animation-timing-function: ease-in;
+    animation-duration: 2s;
+}  
+#bargraph {
+    padding-top: 6px;
+    display: inline-block;
+    text-align: center;
+}
+#legendtable {
+    padding-top: 6px;
+    display: inline-block;
+    text-align: center;
+}
+            
+@keyframes fadeInOpacity {
+    0% {
+        opacity: 0;
+    }
+    100% {
+        opacity: 1;
+    }
+}

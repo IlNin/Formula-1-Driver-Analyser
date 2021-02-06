@@ -4,72 +4,7 @@
         <meta http-equiv="content-type" content="text/html;charset=utf-8">
         <title>Formula 1 Driver Analyzer</title>
         <script type="text/javascript" src="d3.js" charset="utf-8"></script>
-        <style>
-            #abovewrapper {
-                width: fit-content;
-                display: flex;
-            }
-            #title {
-                border: 3px solid black;
-                width: 435px;
-                padding-left: 5px;
-                padding-right: 5px;
-                padding-bottom: 5px;
-                display: inline-block;
-                background: yellow;
-                text-align: center;
-                animation-name: fadeInOpacity;
-                animation-iteration-count: 1;
-                animation-timing-function: ease-in;
-                animation-duration: 2s;
-            }
-             #menu {
-                border: 3px solid black;
-                width: 435px;
-                border-left: none;
-                padding-left: 5px;
-                padding-right: 5px;
-                padding-bottom: 5px;
-                padding-top: 10px;
-                display: inline-block;
-                background: yellow;
-                text-align: center;
-                animation-name: fadeInOpacity;
-                animation-iteration-count: 1;
-                animation-timing-function: ease-in;
-                animation-duration: 2s;
-            }
-            #middlewrapper {
-                display: flex;
-                border: 3px solid black;
-                border-top: 1px solid black;
-                width: fit-content;
-                text-align: center;
-                animation-name: fadeInOpacity;
-                animation-iteration-count: 1;
-                animation-timing-function: ease-in;
-                animation-duration: 2s;
-            }  
-            #bargraph {
-                padding-top: 6px;
-                display: inline-block;
-                text-align: center;
-            }
-             #legendtable {
-                padding-top: 6px;
-                display: inline-block;
-                text-align: center;
-            }
-            
-            @keyframes fadeInOpacity {
-                0% {
-                    opacity: 0;
-                }
-                100% {
-                    opacity: 1;
-                }
-            }
-        </style>
+        <link rel="stylesheet" type="text/css" href="style.css"/>
 	</head>
     
     <body>
@@ -96,7 +31,12 @@
     var barSize = 30;
     var legend_width = 130;
     
+    var wrapper;
+    var barSvg; // Svg for the points bars
+    var svgLegend;
+    
     var showActiveDrivers = true; // Flag that indicates to show only active drivers
+    var showTotalPoints = true; // Flag that indicates to show only active drivers
     var activeDrivers = []; // List of drivers loaded by the data that are active
     var retiredDrivers = []; // List of drivers loaded by the data that are retired
     
@@ -157,6 +97,7 @@
 
         selectDriver = document.createElement('select');
         selectDriver.id = "select-driver";
+        selectDriver.style.width = "150px";
         defaultDriverOption = document.createElement('option');
         defaultDriverOption.value = 0;
         defaultDriverOption.innerHTML = "- DRIVER -";
@@ -215,8 +156,7 @@
                     if(a.surname > b.surname) { return 1; }
                     return 0;
                 });
-                //console.log(activeDrivers);
-                //console.log(retiredDrivers);
+                
                 addDriversToTitle(); // Adds the events to the user's selections in the title now that the data is loaded
                 enableInputsToTitle(data);
             }
@@ -278,39 +218,43 @@
             if (showActiveDrivers) {
                 surname = activeDrivers[value-1].surname;
                 name = activeDrivers[value-1].name;
-                plotPointsAchieved(data, surname, name);
+                initializeChartsLayout(data, surname, name);
             }
             else {
                 surname = retiredDrivers[value-1].surname;
                 name = retiredDrivers[value-1].name;
-                plotPointsAchieved(data, surname, name);
+                initializeChartsLayout(data, surname, name);
             }
         }    
     }
     
-    // Plot a bar graph that shows the points achieved by the driver season by season
-    function plotPointsAchieved(data, surname, name) {
-        // Removes the previous graph and option screen
-        previousGraph = document.getElementById("middlewrapper");
-        if (document.body.contains(previousGraph)) {
-            previousGraph.remove();
+    // Prepares the layouts of the charts before plotting data on them
+    function initializeChartsLayout(data, surname, name) {
+        // Removes the previous layout
+        if (document.body.contains(wrapper)) {
+            wrapper.remove();
         }
-    
-        // Finds the relevant data to plot
-        relevantData = findPointsAchieved(data, surname, name);
         
-        // Initializes the wrapper and the empty svg area
+        // Initializes the middle wrapper
         wrapper = document.createElement('div');
         wrapper.id = "middlewrapper";
         wrapper.innerHTML += "<br>";
         document.body.append(wrapper);
         
+        // Prepares all the layouts
+        preparePointsAchieved(data, surname, name);     
+    }
+    
+    // Prepares the layout for the points achieved chart
+    function preparePointsAchieved(data, surname, name) {
+        // Initializes the div that contains the svg area for the points bars    
         svgDiv = document.createElement('div');
         svgDiv.id = "bargraph";
-        svgDiv.innerHTML = "Total Points Per Season<br>";
+        svgDiv.innerHTML = "Points Per Season<br>";
         wrapper.append(svgDiv); 
         
-        svg = d3.select('#bargraph')
+        // Initalizes an empty svg for the points bars
+        barSvg = d3.select('#bargraph')
             .append('svg')
                 .attr("width", container_dimensions.width)
                 .attr("height", container_dimensions.height)
@@ -319,7 +263,70 @@
                 .attr("transform", "translate(" + margins.left + "," + margins.top + ")")
                 .attr("id", "bargraph");
         
-        // Initializes the scales and colors
+        // Adds radios button in order to switch between total points and average points per race
+        optionsDiv = document.createElement('div');
+        svgDiv.appendChild(optionsDiv);
+        optionsDiv.innerHTML = "Show: ";
+        totalButton = document.createElement('input');
+        totalButton.type = 'radio';
+        totalButton.name = 'points';
+        totalButton.id = 'total-points';
+        totalButton.value = "total";
+        label = document.createElement('label');
+        label.innerHTML = "Total Points";
+        optionsDiv.appendChild(totalButton);
+        optionsDiv.appendChild(label);
+        optionsDiv.innerHTML += "   ";
+
+        averageButton = document.createElement('input');
+        averageButton.type = 'radio';
+        averageButton.name = 'points';
+        averageButton.id = 'average-points';
+        averageButton.value = "average";
+        label = document.createElement('label');
+        label.innerHTML = "Average Points Per Race";
+        optionsDiv.appendChild(averageButton);
+        optionsDiv.appendChild(label);
+        document.getElementById("total-points").checked = true;
+        
+        document.getElementById('total-points').onclick = function() {
+            showTotalPoints = true;
+            plotPointsAchieved(data, surname, name);
+        }
+        document.getElementById('average-points').onclick = function() {
+            showTotalPoints = false;
+            plotPointsAchieved(data, surname, name);
+        }
+      
+        // Initializes the div for the points bar graph legend
+        svgLegendDiv = document.createElement('div');
+        svgLegendDiv.innerHTML = "Legend Table<br>";
+        svgLegendDiv.id = "legendtable";
+        wrapper.append(svgLegendDiv);
+        
+        // Initializes the empty svg for the bar graph legend
+        svgLegend = d3.select('#legendtable')
+            .append('svg')
+                .attr("width", legend_width)
+                .attr("height", container_dimensions.height)
+                // .style("background-color", "red")
+                .append("g")
+                    .attr("transform", "translate(" + 0 + "," + margins.top/4 + ")")
+                    .attr("id","legendtable");
+        
+        // Plots the bar graph that shows the points achieved by the driver season by season
+        plotPointsAchieved(data, surname, name);
+    }
+          
+    // Plot a bar graph that shows the points achieved by the driver season by season
+    function plotPointsAchieved(data, surname, name) {
+        // Erase previous data
+        barSvg.selectAll('*').remove();
+    
+        // Finds the relevant data to plot
+        relevantData = findPointsAchieved(data, surname, name);
+  
+        // Initializes the x scale
         minYear = relevantData[0].key;
         maxYear = relevantData[relevantData.length-1].key;
         x = d3.scaleBand()
@@ -329,6 +336,7 @@
             .range([0, chart_dimensions.width])
             .padding(.5);
         
+        // Initializes the y scale
         maxPoints = 0;
         for (i = 0; i < relevantData.length; i++) {
             points = 0;
@@ -338,11 +346,15 @@
             if (points > maxPoints) {
                 maxPoints = points;
             }
-        }     
+        }
+        if (maxPoints == 0) {
+            maxPoints = 1;
+        }
         y = d3.scaleLinear()
             .domain([maxPoints, 0])
             .range([0, chart_dimensions.height]);
         
+        // Initializes the colors
         colors = d3.scaleOrdinal(d3.schemeCategory20);
         
         // Initializes the axis
@@ -350,11 +362,11 @@
         yAxis = d3.axisLeft(y).ticks().tickFormat(d3.format("d"));
         
         // Appends the x axis
-        svg.append("g")
+        barSvg.append("g")
             .attr("class","x_axis")
             .attr("transform", "translate(0,"+(chart_dimensions.height)+")")
             .call(xAxis);
-        svg.append("text")
+        barSvg.append("text")
             .attr("class","label")
             .attr("x", chart_dimensions.width)
             .attr("y", chart_dimensions.height+(margins.bottom-10))
@@ -362,16 +374,23 @@
             .text("Seasons");
         
         // Appends the y axis
-        svg.append("g")
+        barSvg.append("g")
             .attr("class","y_axis")
             .call(yAxis)
-        svg.append("text")
+        barSvg.append("text")
             .attr("class","label")
             .attr("transform","rotate(-90)")
             .attr("y", 6)
             .attr("dy","-2.2em")
             .style("text-anchor","end")
-            .text("Total Points");
+            .text(function() {
+                if (showTotalPoints) {
+                    return "Total Points";
+                }
+                else {
+                    return "Avg. Points Per Race";
+                }
+            });
        
         // Draws the bars
         constructors = []; // Keeps a list of constructors for the legend
@@ -380,13 +399,12 @@
             for (j = 0; j < relevantData[i].values.length; j++) { // Cycles through the constructors per year
                 constructor = relevantData[i].values[j].key;
                 if (!constructors.includes(constructor) && relevantData[i].values[j].value.totalPoints > 0) { // Filters out constructors with zero points
-                    console.log(relevantData[i].values[j].value.totalPoints);
                     constructors.push(constructor);
                 } 
                 if (j > 0) { // Check if there's a bar below (aka a constructor change in the season) and if so, it takes its measures
                     barBelowY = relevantData[i].values[j-1].value.totalPoints;
                 }
-                bar = svg.selectAll("bar")
+                bar = barSvg.selectAll("bar")
                     .data([relevantData[i].values[j].value]) // The [ ] parenthesis turn the object in an array
                     .enter()
                     .append("rect")
@@ -394,6 +412,7 @@
                         .style("fill", function(d) {
                             return colors(constructor);
                         })
+                        .attr("stroke-width", 3)
                         .attr("x", x(year)) 
                         .attr("width", x.bandwidth)
                         .attr("y", y(0))
@@ -401,17 +420,17 @@
                  
                 // Handles inputs                 
                 bar.on("mouseover", function(d) {
-                    d3.select(this)
+                   d3.select(this)
                         .style("stroke", "black");
                     coords = d3.mouse(this);
                             
                     // Adds information about the points near the mouse location
-                    g = svg.append("g") // Each text label will be inside a black outlined rect in g
+                    g = barSvg.append("g") // Each text label will be inside a black outlined rect in g
                         .attr("class", "rect_label");
                     classLength = d3.select(this).attr("class").length;
                     constructor = d3.select(this).attr("class").substring(0, classLength-4);
                     year = d3.select(this).attr("class").substring(classLength-4, classLength);
-                    text = "[Points: " + d.totalPoints + ", Constructor: " + constructor.replace(/_/g, ' ') + "]";
+                    text = "[Points: " + d.totalPoints.toFixed(2) + ", Constructor: " + constructor.replace(/_/g, ' ') + "]";
                     rect = g.append('rect')
                         .attr("width", text.length*7)
                         .attr("height", 20)
@@ -441,7 +460,7 @@
                    
                 bar.on("mouseout", function(d) {
                     d3.select(this)
-                        .style("stroke", "none");
+                        .style("stroke", "none"); 
                                 
                     // Removes information about the points near the mouse location
                     d3.select(".rect_label")
@@ -467,53 +486,13 @@
         }
         
         // Draws the legend for the graph
-        plotPointsAchievedLegend(constructors);
-        
-        // Adds radios button in order to switch between total points and average points per race
-        optionsDiv = document.createElement('div');
-        svgDiv.appendChild(optionsDiv);
-        optionsDiv.innerHTML = "Show: ";
-        totalButton = document.createElement('input');
-        totalButton.type = 'radio';
-        totalButton.name = 'points';
-        totalButton.id = 'total-points';
-        totalButton.value = "total";
-        label = document.createElement('label');
-        label.innerHTML = "Total Points";
-        optionsDiv.appendChild(totalButton);
-        optionsDiv.appendChild(label);
-        optionsDiv.innerHTML += "   ";
- 
-
-        averageButton = document.createElement('input');
-        averageButton.type = 'radio';
-        averageButton.name = 'points';
-        averageButton.id = 'average-points';
-        averageButton.value = "average";
-        label = document.createElement('label');
-        label.innerHTML = "Average Points Per Race";
-        optionsDiv.appendChild(averageButton);
-        optionsDiv.appendChild(label);
-        document.getElementById("total-points").checked = true;
+        plotPointsAchievedLegend(constructors);      
     }
         
     // Draws the legend for the points bar graph
     function plotPointsAchievedLegend(constructors) {
-        // Initializes the empty svg area
-        wrapper = document.getElementById("middlewrapper");
-        svgLegendDiv = document.createElement('div');
-        svgLegendDiv.innerHTML = "Legend Table<br>";
-        svgLegendDiv.id = "legendtable";
-        wrapper.append(svgLegendDiv);
-        
-        svgLegend = d3.select('#legendtable')
-            .append('svg')
-                .attr("width", legend_width)
-                .attr("height", container_dimensions.height)
-                // .style("background-color", "red")
-                .append("g")
-                    .attr("transform", "translate(" + 0 + "," + margins.top/4 + ")")
-                    .attr("id","legendtable");
+        // Erase previous data
+        svgLegend.selectAll('*').remove();
         
         // Prepares the space/layout for the legend
         sizeSquare = 10;
@@ -557,11 +536,9 @@
                     .attr("stroke", "black");
                 d3.select(".text"+d)
                     .attr("text-decoration", "underline overline");
-                d3.select("." + d + 2019)
-                        .attr("stroke", "black");
                 for (i = 1950; i <= 2019; i++) {
-                    d3.select("." + d.replace(/\s/g, '_') + i)
-                        .attr("stroke", "black")
+                    d3.select("." + d + i)
+                        .attr("stroke", "black");                   
                 } 
             })
             .on("mouseout", function(d) {
@@ -570,10 +547,8 @@
                     .attr("stroke", "none");
                 d3.select(".text"+d)
                     .attr("text-decoration", "none");
-                d3.select("." + d + 2019)
-                        .attr("stroke", "null");
                 for (i = 1950; i <= 2019; i++) {
-                    d3.select("." + d.replace(/\s/g, '_') + 2019)
+                    d3.select("." + d + i)
                         .attr("stroke", "none");
                 } 
             }); */
@@ -598,21 +573,41 @@
         }
         
         // Groups the relevant results by year/constructor and finds the total number of points by year/constructor
-        relevantResults = d3.nest()
-            .key(function(d) {
-                return d.year;
-            })
-            .key(function(d) {
-                return d.constructor.replace(/\s/g, '_');
-            })
-            .rollup(function(d) {
-                return {
-                    totalPoints: d3.sum(d, function(g) {
-                        return g.points;
-                    })
-                }
-             })
-            .entries(relevantResults);
+        if (showTotalPoints) {
+            relevantResults = d3.nest()
+                .key(function(d) {
+                    return d.year;
+                })
+                .key(function(d) {
+                    return d.constructor.replace(/\s/g, '_');
+                })
+                .rollup(function(d) {
+                    return {
+                        totalPoints: d3.sum(d, function(g) {
+                            return g.points;
+                        })
+                    }
+                })
+                .entries(relevantResults);
+        }
+        // Groups the relevant results by year/constructor and finds the average number of points per race by year/constructor
+        else {
+            relevantResults = d3.nest()
+                .key(function(d) {
+                    return d.year;
+                })
+                .key(function(d) {
+                    return d.constructor.replace(/\s/g, '_');
+                })
+                .rollup(function(d) {
+                    return {
+                        totalPoints: d3.mean(d, function(g) {
+                            return g.points;
+                        })
+                    }
+                })
+                .entries(relevantResults);
+        }
         
         console.log(relevantResults);   
         return relevantResults;
