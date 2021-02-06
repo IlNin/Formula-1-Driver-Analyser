@@ -230,10 +230,11 @@
     
     // Prepares the layouts of the charts before plotting data on them
     function initializeChartsLayout(data, surname, name) {
-        // Removes the previous layout
+        // Removes the previous layout and restores global variables
         if (document.body.contains(wrapper)) {
             wrapper.remove();
         }
+        showTotalPoints = true;
         
         // Initializes the middle wrapper
         wrapper = document.createElement('div');
@@ -242,7 +243,8 @@
         document.body.append(wrapper);
         
         // Prepares all the layouts
-        preparePointsAchieved(data, surname, name);     
+        preparePointsAchieved(data, surname, name);    
+        prepareComparisons(data, surname, name);
     }
     
     // Prepares the layout for the points achieved chart
@@ -412,12 +414,49 @@
                         .style("fill", function(d) {
                             return colors(constructor);
                         })
+                        .style("opacity", function(d) {
+                            if (d.totalPoints == 0) {
+                                return 0; }
+                            else {
+                                return 1;
+                            }
+                        })
                         .attr("stroke-width", 3)
                         .attr("x", x(year)) 
                         .attr("width", x.bandwidth)
                         .attr("y", y(0))
                         .attr("height", 0);
-                 
+                        
+                // Handles the animations
+                drawInvisibleBar = true; // Flag that indicates to draw an invisible bar in case there are no points (so that labels can still appear)
+                bar.transition()
+                    .duration(2000)
+                    .attr("y", function(d) { 
+                        if (j > 0) { // If there's a bar below, stack the new bar above it
+                            return y(d.totalPoints + barBelowY);
+                        }
+                        if (d.totalPoints == 0) { // Check if to draw an invisible bar
+                            for (z = j; z < relevantData[i].values.length; z++) { // Checks if the driver got points with other constructors in that year
+                                if (relevantData[i].values[z].value.totalPoints > 0) {
+                                    drawInvisibleBar = false; // Can't draw a bar since there's will be a visible bar later for this year
+                                }
+                            }
+                            if (drawInvisibleBar) {
+                                return y(maxPoints);
+                            }
+                        }
+                        return y(d.totalPoints); 
+                    })
+                    .attr("height", function(d) { 
+                        if (j > 0) {
+                            return y(barBelowY) - y(d.totalPoints+barBelowY);
+                        }
+                        if (d.totalPoints == 0 && drawInvisibleBar) { // Invisible bar
+                            return chart_dimensions.height - y(maxPoints);
+                        }
+                        return chart_dimensions.height - y(d.totalPoints); 
+                    })
+                
                 // Handles inputs                 
                 bar.on("mouseover", function(d) {
                    d3.select(this)
@@ -467,21 +506,7 @@
                         .remove();
                 });
                
-                // Handles the animations
-                bar.transition()
-                    .duration(2000)
-                    .attr("y", function(d) { 
-                        if (j > 0) { // If there's a bar below, stack the new bar above it
-                            return y(d.totalPoints + barBelowY);
-                        }
-                        return y(d.totalPoints); 
-                    })
-                    .attr("height", function(d) { 
-                        if (j > 0) {
-                            return y(barBelowY) - y(d.totalPoints+barBelowY);
-                        }
-                        return chart_dimensions.height - y(d.totalPoints); 
-                    })
+                
             }        
         }
         
@@ -553,7 +578,27 @@
                 } 
             }); */
     }
+    
+    // Prepares the layout for the comparisons with teammates chart
+    function prepareComparisons(data, surname, name) {
+        // Initializes the div that contains the svg area for the comparisons   
+        svgCmpDiv = document.createElement('div');
+        svgCmpDiv.id = "comparisons";
+        svgCmpDiv.innerHTML = "Wins Against Teammates<br>";
+        wrapper.append(svgCmpDiv); 
         
+        // Initalizes an empty svg for the points bars
+        cmpSvg = d3.select('#comparisons')
+            .append('svg')
+                .attr("width", container_dimensions.width)
+                .attr("height", container_dimensions.height)
+                //.style("background-color", "red")
+            .append("g")
+                .attr("transform", "translate(" + margins.left + "," + margins.top + ")")
+                .attr("id", "bargraph");
+    }
+        
+          
     // Finds the points achieved by a driver season by season
     function findPointsAchieved(data, surname, name) {
         // Groups all the results by pilot

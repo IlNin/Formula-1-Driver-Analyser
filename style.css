@@ -53,6 +53,12 @@
     display: inline-block;
     text-align: center;
 }
+#comparisons {
+    padding-top: 6px;
+    display: inline-block;
+    text-align: center;
+    border-left: 3px solid black;
+}
             
 @keyframes fadeInOpacity {
     0% {
