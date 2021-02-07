@@ -17,7 +17,7 @@
         constructor(surname, name) {
             this.surname = surname;
             this.name = name;
-            this.concatName = surname + " " + name;
+            this.concatName = surname.replace(/_/g, ' ') + " " + name.replace(/_/g, ' ');
         }
     }
     
@@ -29,7 +29,7 @@
             height: container_dimensions.height - margins.top - margins.bottom
     };
     var barSize = 30;
-    var legend_width = 130;
+    var legend_width = 119;
     
     var wrapper;
     var barSvg; // Svg for the points bars
@@ -39,6 +39,10 @@
     var showTotalPoints = true; // Flag that indicates to show only active drivers
     var activeDrivers = []; // List of drivers loaded by the data that are active
     var retiredDrivers = []; // List of drivers loaded by the data that are retired
+    
+    var barsClicked = []; // List of bars clicked in the total points chart
+    var nBarsClicked = 0;
+    var cumulativePoints = 0;
     
     function contains(drivers, driver) {
         for (i = 0; i < drivers.length; i++) {
@@ -248,7 +252,7 @@
     }
     
     // Prepares the layout for the points achieved chart
-    function preparePointsAchieved(data, surname, name) {
+    function preparePointsAchieved(data, surname, name) { 
         // Initializes the div that contains the svg area for the points bars    
         svgDiv = document.createElement('div');
         svgDiv.id = "bargraph";
@@ -324,6 +328,9 @@
     function plotPointsAchieved(data, surname, name) {
         // Erase previous data
         barSvg.selectAll('*').remove();
+        barsClicked = []; 
+        nBarsClicked = 0;
+        cumulativePoints = 0
     
         // Finds the relevant data to plot
         relevantData = findPointsAchieved(data, surname, name);
@@ -400,12 +407,16 @@
             year = relevantData[i].key;
             for (j = 0; j < relevantData[i].values.length; j++) { // Cycles through the constructors per year
                 constructor = relevantData[i].values[j].key;
+                
+                // Behind the scenes stuff
                 if (!constructors.includes(constructor) && relevantData[i].values[j].value.totalPoints > 0) { // Filters out constructors with zero points
                     constructors.push(constructor);
                 } 
                 if (j > 0) { // Check if there's a bar below (aka a constructor change in the season) and if so, it takes its measures
                     barBelowY = relevantData[i].values[j-1].value.totalPoints;
                 }
+                
+                // Draws the bar
                 bar = barSvg.selectAll("bar")
                     .data([relevantData[i].values[j].value]) // The [ ] parenthesis turn the object in an array
                     .enter()
@@ -455,58 +466,116 @@
                             return chart_dimensions.height - y(maxPoints);
                         }
                         return chart_dimensions.height - y(d.totalPoints); 
-                    })
+                    });
                 
                 // Handles inputs                 
                 bar.on("mouseover", function(d) {
-                   d3.select(this)
-                        .style("stroke", "black");
+                    /* BUG
+                    d3.select(this)
+                        .style("stroke", "black"); */
+                    
+                    // Draws a label with information about the bar
                     coords = d3.mouse(this);
-                            
-                    // Adds information about the points near the mouse location
-                    g = barSvg.append("g") // Each text label will be inside a black outlined rect in g
-                        .attr("class", "rect_label");
                     classLength = d3.select(this).attr("class").length;
                     constructor = d3.select(this).attr("class").substring(0, classLength-4);
                     year = d3.select(this).attr("class").substring(classLength-4, classLength);
                     text = "[Points: " + d.totalPoints.toFixed(2) + ", Constructor: " + constructor.replace(/_/g, ' ') + "]";
-                    rect = g.append('rect')
-                        .attr("width", text.length*7)
-                        .attr("height", 20)
-                        .attr("stroke", "black")
-                        .style("fill", "white"); 
-                            
-                    // Checks if to place the information on the right or on the left of the mouse location
-                    if (parseInt(year) <= (parseInt(minYear)+ parseInt(maxYear))/2) {
-                        rect.attr("x", coords[0]+6)
-                            .attr("y", coords[1]-30);
-                        g.append('text')
-                            .attr("x", coords[0]+10)
-                            .attr("y", coords[1]-15)
-                            .attr("fill", colors(constructor))
-                            .text(text);
-                        }
-                        else {
-                            rect.attr("x", coords[0]-200)
-                                .attr("y", coords[1]-30);
-                             g.append('text')
-                                .attr("x", coords[0]-196)
-                                .attr("y", coords[1]-15)
-                                .attr("fill", colors(constructor))
-                                .text(text);      
-                        }              
-                    })
+                    drawOnMouseOverLabel(coords, barSvg, text, colors(constructor), year, minYear, maxYear);
+                });
                    
                 bar.on("mouseout", function(d) {
-                    d3.select(this)
-                        .style("stroke", "none"); 
+                    /* BUG
+                    if (!barsClicked.includes(d3.select(this).attr("class"))) {
+                        d3.select(this)
+                            .style("stroke", "none"); 
+                    } */
                                 
-                    // Removes information about the points near the mouse location
+                    // Removes the label with information about the bar
                     d3.select(".rect_label")
                         .remove();
                 });
-               
                 
+                bar.on("click", function(d) {
+                    // Selects the bar clicked, and also the other bars in the same year
+                    year = d3.select(this).attr("class").substring(classLength-4, classLength);
+                    selection = d3.selectAll("[class$='" + year + "']");
+                    
+                    // Calculates the total number of points to add/remove to the average
+                    points = selection.data();
+                    totalPoints = 0;
+                    for (i = 0; i < points.length; i++) {
+                        totalPoints += points[i].totalPoints;
+                    }
+                    
+                    // Gives them a stroke if they have been selected for the first time, otherwise removes the previous stroke
+                    add = true; // Flag that indicates if to increase or decrease the total number of points across the season 
+                    selection
+                        .attr("stroke", function(d) {
+                            currentClass = d3.select(this).attr("class");
+                            if (!barsClicked.includes(currentClass)) {
+                                // console.log("Adding: " + currentClass);
+                                barsClicked.push(currentClass);
+                                return "black";
+                            }
+                            else {
+                                add = false;
+                                // console.log("Removing: " + currentClass);
+                                index = barsClicked.indexOf(currentClass);
+                                barsClicked.splice(index, 1);
+                                return "null";
+                            }
+                        })
+                        .style("opacity", function(d) {
+                            if (d3.select(this).style("opacity") == 0) {
+                                return 0.1;
+                            }
+                            else if (d3.select(this).style("opacity") == 0.1) {
+                                return 0;
+                            }
+                       });
+                    
+                    // Calculates the total number of points to add/remove to the cumulative points across the seasons
+                    points = selection.data();
+                    if (add) {
+                        nBarsClicked += 1;
+                        for (i = 0; i < points.length; i++) {
+                            cumulativePoints += points[i].totalPoints;
+                        }
+                    }
+                    else {
+                        nBarsClicked -= 1;
+                        for (i = 0; i < points.length; i++) {
+                            cumulativePoints -= points[i].totalPoints;
+                        }
+                    }
+                    
+                    // DEBUG
+                    console.log("[" + cumulativePoints + ", " + nBarsClicked + "]"); 
+                    
+                    // Adds/update a mean line in the total points bar chart
+                    d3.select(".mean").remove()
+                    
+                    if (nBarsClicked > 0) {
+                        mean = cumulativePoints/nBarsClicked;
+                        barSvg.append("line")
+                            .attr("class", "mean")
+                            .attr("x1", 0)
+                            .attr("y1", y(mean))
+                            .attr("x2", chart_dimensions.width)
+                            .attr("y2", y(mean))
+                            .style("stroke", "red")
+                            .style("stroke-width", 3)
+                            .on("mouseover", function(d) {
+                                coords = d3.mouse(this);
+                                text = "[Mean: " + mean.toFixed(2) + ", Sum: " + cumulativePoints.toFixed(2) + "] ";
+                                drawOnMouseOverLabel(coords, barSvg, text, "red", year, minYear, maxYear);
+                            })
+                            .on("mouseout", function(d) {
+                                d3.select(".rect_label")
+                                    .remove();
+                            });
+                    }
+                });
             }        
         }
         
@@ -596,9 +665,58 @@
             .append("g")
                 .attr("transform", "translate(" + margins.left + "," + margins.top + ")")
                 .attr("id", "bargraph");
-    }
+                
+        // Initializes the div for the points bar graph legend
+        svgCmpLegendDiv = document.createElement('div');
+        svgCmpLegendDiv.innerHTML = "Legend Table<br>";
+        svgCmpLegendDiv.id = "cmplegendtable";
+        wrapper.append(svgCmpLegendDiv);
         
-          
+        // Initializes the empty svg for the bar graph legend
+        svgCmpLegend = d3.select('#cmplegendtable')
+            .append('svg')
+                .attr("width", legend_width)
+                .attr("height", container_dimensions.height)
+                // .style("background-color", "red")
+                .append("g")
+                    .attr("transform", "translate(" + 0 + "," + margins.top/4 + ")")
+                    .attr("id","cmplegendtable");
+        
+        findWinsAgainstTeammates(data, surname, name);
+    }
+    
+    // Draws on the svg a label near the mouse location
+    function drawOnMouseOverLabel(coords, svg, text, color, place, minPlace, maxPlace) {
+        // Each text label will be inside a black outlined rect in g
+        g = svg.append("g") 
+            .attr("class", "rect_label");
+        rect = g.append('rect')
+            .attr("width", text.length*7)
+            .attr("height", 20)
+            .attr("stroke", "black")
+            .style("fill", "white"); 
+                            
+        // Checks if to place the information on the right or on the left of the mouse location
+        if (parseInt(place) <= (parseInt(minPlace)+ parseInt(maxPlace))/2) {
+            rect.attr("x", coords[0]+6)
+                .attr("y", coords[1]-30);
+            g.append('text')
+                .attr("x", coords[0]+10)
+                .attr("y", coords[1]-15)
+                .attr("fill", color)
+                .text(text);
+        }
+        else {
+            rect.attr("x", coords[0]-200)
+                .attr("y", coords[1]-30);
+            g.append('text')
+                .attr("x", coords[0]-196)
+                .attr("y", coords[1]-15)
+                .attr("fill", color)
+                .text(text);      
+        }
+    }                        
+        
     // Finds the points achieved by a driver season by season
     function findPointsAchieved(data, surname, name) {
         // Groups all the results by pilot
@@ -654,11 +772,110 @@
                 .entries(relevantResults);
         }
         
-        console.log(relevantResults);   
+        /* DEBUG
+        console.log(relevantResults); */
         return relevantResults;
     }
+     
+    // Finds how many times the current driver has won against his teammates
+    function findWinsAgainstTeammates(data, surname, name) {
+        // Groups all the results by race and constructor
+        groupedResults = d3.nest()
+            .key(function(d) {
+                return d.year + "_" + d.round + "_" + d.grandprix + "_" + d.constructor;
+            })
+            .entries(data);
         
-                       
+        // Extracts the results of the selected driver and his teammate for each race
+        relevantResults = [];
+        for (i = 0; i < groupedResults.length; i++) {
+            constructorResults = groupedResults[i].values;
+            for (j = 0; j < constructorResults.length; j++) {
+                if (constructorResults[j].surname == surname && constructorResults[j].name == name) {
+                    relevantResults.push(constructorResults);
+                }
+            }
+        }
+        console.log(relevantResults);
+        
+        // Transforms the relevant results in tuples
+        newTuples = [];
+        for (i = 0; i < relevantResults.length; i++) {
+            selectedDriverPosition = 0;
+            teammatePosition = 0;
+            
+            // Checks where's the selected driver in the relevantResult array
+            if (relevantResults[i][0].surname == surname && relevantResults[i][0].name == name) {
+                selectDriverPosition = 0;
+                teammatePosition = 1;
+            }
+            else {
+                selectedDriverPosition = 1;
+                teammatePosition = 0;
+            }
+            
+            // Creates the new tuple
+            newTuple = {
+                year: relevantResults[i][0].year,
+                round: relevantResults[i][0].round,
+                grandprix: relevantResults[i][0].grandprix,
+                constructor: relevantResults[i][0].constructor,
+                selectedDriverSurname: relevantResults[i][selectedDriverPosition].surname,
+                selectedDriverName: relevantResults[i][selectedDriverPosition].name,
+                selectedDriverPosition: relevantResults[i][selectedDriverPosition].position,
+                teammateSurname: relevantResults[i][teammatePosition].surname,
+                teammateName: relevantResults[i][teammatePosition].name,
+                teammatePosition: relevantResults[i][teammatePosition].position
+                }
+            newTuples.push(newTuple);
+        }   
+        
+        // Transforms the data in the final form used by the chart
+        relevantData = d3.nest()
+            .key(function(d) {
+                return d.year + "_" + d.teammateSurname + "_" + d.teammateName;
+            })
+            .rollup(function(d) {
+                return {
+                    selectedDriverWins: d3.sum(d, function(g) {
+                        if (g.selectedDriverPosition == "\\N" && g.teammatePosition != "\\N") {
+                            return 0;
+                        }
+                        if (g.selectedDriverPosition != "\\N" && g.teammatePosition == "\\N") {
+                            return 1;
+                        }
+                        if (g.selectedDriverPosition == "\\N" && g.teammatePosition == "\\N") {
+                            return 0;
+                        }
+                        if (g.selectedDriverPosition < g.teammatePosition) {
+                            return 1;
+                        }
+                        return 0;
+                    }),
+                    teammateWins: d3.sum(d, function(g) {
+                        if (g.selectedDriverPosition == "\\N" && g.teammatePosition != "\\N") {
+                            return 1;
+                        }
+                        if (g.selectedDriverPosition != "\\N" && g.teammatePosition == "\\N") {
+                            return 0;
+                        }
+                        if (g.selectedDriverPosition == "\\N" && g.teammatePosition == "\\N") {
+                            return 1;
+                        }
+                        if (g.teammatePosition < g.selectedDriverPosition) {
+                            return 1;
+                        }
+                        return 0;
+                    }),
+                    teammateSurname: d.teammateSurname
+               }
+            })
+            .entries(newTuples);   
+                
+        console.log(relevantData);
+        return relevantData;
+    }
+        
     drawTitle();
     </script>
     </body>
