@@ -653,7 +653,7 @@
         // Initializes the div that contains the svg area for the comparisons   
         svgCmpDiv = document.createElement('div');
         svgCmpDiv.id = "comparisons";
-        svgCmpDiv.innerHTML = "Wins Against Teammates<br>";
+        svgCmpDiv.innerHTML = "Wins/Losses Against Teammates<br>";
         wrapper.append(svgCmpDiv); 
         
         // Initalizes an empty svg for the points bars
@@ -665,7 +665,33 @@
             .append("g")
                 .attr("transform", "translate(" + margins.left + "," + margins.top + ")")
                 .attr("id", "bargraph");
-                
+        
+        // Adds radios button in order to switch between total points and average points per race
+        optionsDiv = document.createElement('div');
+        svgCmpDiv.appendChild(optionsDiv);
+        optionsDiv.innerHTML = "Show: ";
+        winsRacesButton = document.createElement('input');
+        winsRacesButton.type = 'radio';
+        winsRacesButton.name = 'races-or-quali';
+        winsRacesButton.id = 'show-races';
+        winsRacesButton.value = "races";
+        label = document.createElement('label');
+        label.innerHTML = "Wins In Races";
+        optionsDiv.appendChild(winsRacesButton);
+        optionsDiv.appendChild(label);
+        optionsDiv.innerHTML += "   ";
+
+        winsQualiButton = document.createElement('input');
+        winsQualiButton.type = 'radio';
+        winsQualiButton.name = 'races-or-quali';
+        winsQualiButton.id = 'show-quali';
+        winsQualiButton.value = "quali";
+        label = document.createElement('label');
+        label.innerHTML = "Wins In Qualifying";
+        optionsDiv.appendChild(winsQualiButton);
+        optionsDiv.appendChild(label);
+        document.getElementById("show-races").checked = true;
+        
         // Initializes the div for the points bar graph legend
         svgCmpLegendDiv = document.createElement('div');
         svgCmpLegendDiv.innerHTML = "Legend Table<br>";
@@ -764,15 +790,25 @@
             .attr("class","label")
             .attr("transform","rotate(-90)")
             .attr("y", 6)
-            .attr("dy","-2.2em")
+            .attr("dy","-2.5em")
             .style("text-anchor","end")
-            .text("Wins Against Each Other");
+            .style("font", "12px times")
+            .text("Wins In Races");
         
         // Appends the bottom y axis
-        cmpSvg.append("g")
+        abc = cmpSvg.append("g")
             .attr("transform", "translate(0," + (chart_dimensions.height)/2 + ")")
             .attr("class","yBottom_axis")
             .call(yBottomAxis); 
+        cmpSvg.append("text")
+            .attr("class","label")
+            //.attr("transform","rotate(-90)")
+            .attr("transform", "translate(0," + (chart_dimensions.height) + ")" + "rotate(-90)")
+            .attr("y", 6)
+            .attr("dy","-2.5em")
+            .style("text-anchor","start")
+            .style("font", "12px times")
+            .text("Losses In Races");
         
         // Plot the data
         teammates = []; // Contains the list of drivers involved in the comparison
@@ -822,31 +858,38 @@
                                 return colorsTeammates(teammate);
                             }
                         })
-                        .style("stroke", "black")
+                        .style("stroke", "white")
                         .style("stroke-width", 1)
                         .attr("x", x(year)) 
                         .attr("width", x.bandwidth)
-                        .attr("y", function(d) {
-                            if (j == 0) {
-                                return yTop(d.selectedDriverWins + barBelowTopY);
+                        .attr("y", yTop(0))
+                        .attr("height", 0);
+                
+                // Handles animation
+                bar.transition()
+                    .duration(2000)
+                    .attr("y", function(d) {
+                        if (j == 0) {
+                            return yTop(d.selectedDriverWins + barBelowTopY);
+                        }
+                        else {
+                            return yTop(-barAboveBottomY);
+                        }
+                    })
+                    .attr("height", function(d) {
+                        if (j == 0) {
+                            if (barBelowTopY == 0) {
+                                return chart_dimensions.height/2 - yTop(d.selectedDriverWins);
                             }
                             else {
-                                return yTop(-barAboveBottomY);
+                                return yTop(barBelowTopY) - yTop(d.selectedDriverWins + barBelowTopY);
                             }
-                        })
-                        .attr("height", function(d) {
-                            if (j == 0) {
-                                if (barBelowTopY == 0) {
-                                    return chart_dimensions.height/2 - yTop(d.selectedDriverWins);
-                                }
-                                else {
-                                    return yTop(barBelowTopY) - yTop(d.selectedDriverWins + barBelowTopY);
-                                }
-                            }
-                            else {
-                                return yBottom(d.teammateWins);
-                            }
-                        });
+                        }
+                        else {
+                            return yBottom(d.teammateWins);
+                       }
+                    });
+                    
               
                 // Handles inputs
                 bar.on("mouseover", function(d) {
