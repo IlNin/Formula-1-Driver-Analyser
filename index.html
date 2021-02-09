@@ -2,7 +2,7 @@
 <html>
     <head>
         <meta http-equiv="content-type" content="text/html;charset=utf-8">
-        <title>Formula 1 Driver Analyzer</title>
+        <title>Formula 1 Driver Analyser</title>
         <script type="text/javascript" src="d3.js" charset="utf-8"></script>
         <link rel="stylesheet" type="text/css" href="style.css"/>
 	</head>
@@ -40,12 +40,15 @@
         // Creates the wrapper div that contains the div 'title'
         aboveWrapper = document.createElement('div');
         aboveWrapper.id = "abovewrapper";
+        aboveWrapper.onmouseover = function() {
+            writeOnAbout(0);
+        }
         document.body.appendChild(aboveWrapper);
         
         // Creates the div 'title' which contains text, selections and buttons
         title = document.createElement('div');
         title.id = "title";
-        title.innerHTML = "<h2>Formula 1 Driver Analyzer</h2>";
+        title.innerHTML = "<h2>Formula 1 Driver Analyser</h2>";
         aboveWrapper.appendChild(title);   
         
         // Creates the div 'menu' which allows the user to select a driver
@@ -98,8 +101,9 @@
         menu.appendChild(searchButton);
         
         about = document.createElement('div');
-        about.id = "menu";
+        about.id = "about";
         aboveWrapper.appendChild(about);
+        writeOnAbout(0);
         
         document.getElementById("active-drivers").checked = true; 
         loadData();
@@ -240,6 +244,7 @@
         showTotalPoints = true;
         showWinsInRaces = true;
         
+        // Appends the div with the name of the driver selected
         driverSelectedDiv = document.createElement('div');
         driverSelectedDiv.id = "selecteddriver";
         driverSelectedDiv.innerHTML = "<b>" + selectedDriver.replace(/_/g, ' ') + "</b";
@@ -262,6 +267,9 @@
         svgDiv = document.createElement('div');
         svgDiv.id = "bargraph";
         svgDiv.innerHTML = "<b>Points Per Season</b><br>";
+        svgDiv.onmouseover = function() {
+            writeOnAbout(1);
+        }
         wrapper.append(svgDiv); 
         
         // Initalizes an empty svg for the points bars
@@ -313,6 +321,9 @@
         svgLegendDiv = document.createElement('div');
         svgLegendDiv.innerHTML = "Legend Table<br>";
         svgLegendDiv.id = "legendtable";
+        svgLegendDiv.onmouseover = function() {
+            writeOnAbout(1);
+        }
         wrapper.append(svgLegendDiv);
         
         // Initializes the empty svg for the bar graph legend
@@ -474,11 +485,7 @@
                     });
                 
                 // Handles inputs                 
-                bar.on("mouseover", function(d) {
-                    /* BUG
-                    d3.select(this)
-                        .style("stroke", "black"); */
-                    
+                bar.on("mouseover", function(d) {  
                     // Draws a label with information about the bar
                     coords = d3.mouse(this);
                     classLength = d3.select(this).attr("class").length;
@@ -488,13 +495,7 @@
                     drawOnMouseOverLabel(coords, barSvg, text, colors(constructor), year, minYear, maxYear);
                 });
                    
-                bar.on("mouseout", function(d) {
-                    /* BUG
-                    if (!barsClicked.includes(d3.select(this).attr("class"))) {
-                        d3.select(this)
-                            .style("stroke", "none"); 
-                    } */
-                                
+                bar.on("mouseout", function(d) {              
                     // Removes the label with information about the bar
                     d3.select(".rect_label")
                         .remove();
@@ -627,7 +628,7 @@
                 return d.replace(/_/g, ' ');
             });
             
-        /* Add input events to the legend
+        // Add input events to the legend
         legend
             .on("mouseover", function(d) {
                 // Highlights the entry in the legend and outlines the right bars
@@ -635,10 +636,10 @@
                     .attr("stroke", "black");
                 d3.select(".text"+d)
                     .attr("text-decoration", "underline overline");
-                for (i = 1950; i <= 2019; i++) {
-                    d3.select("." + d + i)
-                        .attr("stroke", "black");                   
-                } 
+                if (nBarsClicked == 0) {
+                    barSvg.selectAll("[class*=" + d + "]")
+                        .attr("stroke", "black");        
+                }
             })
             .on("mouseout", function(d) {
                 // Restores everything
@@ -646,11 +647,11 @@
                     .attr("stroke", "none");
                 d3.select(".text"+d)
                     .attr("text-decoration", "none");
-                for (i = 1950; i <= 2019; i++) {
-                    d3.select("." + d + i)
-                        .attr("stroke", "none");
-                } 
-            }); */
+                if (nBarsClicked == 0) {
+                    barSvg.selectAll("[class*=" + d + "]")
+                        .attr("stroke", "none"); 
+                }
+            });
     }
     
     // Prepares the layout for the comparisons with teammates chart
@@ -659,6 +660,9 @@
         svgCmpDiv = document.createElement('div');
         svgCmpDiv.id = "comparisons";
         svgCmpDiv.innerHTML = "<b>Wins/Losses Against Teammates</b><br>";
+        svgCmpDiv.onmouseover = function() {
+            writeOnAbout(2);
+        }
         wrapper.append(svgCmpDiv); 
         
         // Initalizes an empty svg for the points bars
@@ -710,6 +714,9 @@
         svgCmpLegendDiv = document.createElement('div');
         svgCmpLegendDiv.innerHTML = "Legend Table<br>";
         svgCmpLegendDiv.id = "cmplegendtable";
+        svgCmpLegendDiv.onmouseover = function() {
+            writeOnAbout(2);
+        }
         wrapper.append(svgCmpLegendDiv);
         
         // Initializes the empty svg for the bar graph legend
@@ -740,7 +747,7 @@
             relevantData = findWinsAgainstTeammates(data2);
         }
         
-        // Initializes the x scale
+        // Initializes the x scale and finds the range of seasons
         minYear = relevantData[0].key.substring(0, 4);
         maxYear = relevantData[relevantData.length-1].key.substring(0, 4);
         x = d3.scaleBand()
@@ -750,14 +757,14 @@
             .range([0, chart_dimensions.width])
             .padding(.5);
         
-        // Initializes the y scale
+        // Initializes the y scale and finds the biggest number of wins/losses in order to set up the scale
         maxWins = 0;
         previousYear = 0;
         topWins = 0;
         bottomWins = 0;
-        for (i = 0; i < relevantData.length; i++) {
-            year = relevantData[i].key.substring(0, 4);
-            if (year != previousYear) {
+        for (i = 0; i < relevantData.length; i++) { // Cycles through the years
+            year = relevantData[i].key.substring(0, 4); // Gets current year
+            if (year != previousYear) { // If it is a new year (meaning no new teammates in the same year) the number of wins is resetted.
                 previousYear = year;
                 topWins = 0;
                 bottomWins = 0;
@@ -836,7 +843,7 @@
             .style("font", "12px times")
             .text(function(d) {
                 if (showWinsInRaces) {
-                    return "Losses In Qualy";
+                    return "Losses In Races";
                 }
                 else {
                     return "Losses In Qualy";
@@ -877,10 +884,10 @@
                     .append("rect")
                         .attr("class", function(d) {
                             if (j == 0) { // Index 0 means this is the selected driver
-                                return "0" + relevantData[i].key;
+                                return "rect0" + relevantData[i].key;
                             }
                             else { // Index 1 means this is the teammate
-                                return "1" + relevantData[i].key;
+                                return "rect1" + relevantData[i].key;
                             }
                         })
                         .style("fill", function(d) {
@@ -929,9 +936,9 @@
                     // Draws a label with information about the bar
                     coords = d3.mouse(this);
                     id = d3.select(this).attr("class");
-                    flagTop = id.substring(0, 1);
-                    year = id.substring(1, 5);
-                    teammate = id.substring(6, id.length);
+                    flagTop = id.substring(4, 5);
+                    year = id.substring(5, 9);
+                    teammate = id.substring(10, id.length);
                     text = "";
                     color = "";
                     if (flagTop == "0") {     
@@ -996,7 +1003,8 @@
                 return d.replace(/_/g, ' ');
             });
         
-         legend
+        // Add input events to the legend
+        legend
             .on("mouseover", function(d) {
                 // Highlights the entry in the legend and outlines the right bars
                 if (activeDrivers.includes(d) || retiredDrivers.includes(d)) {
@@ -1005,6 +1013,14 @@
                     d3.select(".text"+d)
                         .attr("text-decoration", "underline overline");    
                 }
+                if (d == selectedDriver) {
+                    cmpSvg.selectAll("[class^=rect0]")
+                        .style("stroke", "black");
+                }
+                else {
+                    cmpSvg.selectAll("[class^=rect1][class$=" + d + "]")
+                        .style("stroke", "black");
+                }
             })
             .on("mouseout", function(d) {
                 // Restores everything
@@ -1012,6 +1028,8 @@
                     .attr("stroke", "none");
                 d3.select(".text"+d)
                     .attr("text-decoration", "none");
+                cmpSvg.selectAll("[class^=rect]")
+                    .style("stroke", "white")
             })
             .on("click", function(d) {
                 if (activeDrivers.includes(d) || retiredDrivers.includes(d)) {
@@ -1052,6 +1070,23 @@
                 .text(text);      
         }
     }                        
+    
+    // Writes the right text on the upper right section of the application
+    function writeOnAbout(index) {
+        if (index == 0) {
+            about.innerHTML = "This is a VA application that lets the user find stats on Formula 1 drivers, so that they can gain a better knowledge of their skill and place in the sport.<br>";
+            about.innerHTML += "<i>- Made by Luca Sannino as a project for Visual Analytics 2021 -</i>";
+        }
+        else if (index == 1) {
+            about.innerHTML = "This bar chart shows the total points achieved by the selected driver per season. The user can also switch to the avg. points per race (per season) and interact with the bars by clicking them to calculate new averages on-the-fly.";
+        }
+        else if (index == 2) {
+            about.innerHTML = "This bar charts shows how many times the selected driver has placed better than their teammates across the seasons. The user can also switch between race and qualifying results and interact with the legend to select a new driver.";
+        }
+        else {
+            about.innerHTML = index;
+        }
+    }
         
     // Finds the points achieved by a driver season by season
     function findPointsAchieved(data) {
