@@ -36,7 +36,9 @@
     var svgLegend;
     
     var showActiveDrivers = true; // Flag that indicates to show only active drivers
-    var showTotalPoints = true; // Flag that indicates to show only active drivers
+    var showTotalPoints = true; // Flag that indicates to show the total points instead of the average per race
+    var showWinsInRaces = true; // Flag that indicates to show the wins in races instead of qualifying
+    
     var activeDrivers = []; // List of drivers loaded by the data that are active
     var retiredDrivers = []; // List of drivers loaded by the data that are retired
     
@@ -126,45 +128,64 @@
     
     // Loads the data from the csv file
     function loadData() {
-        d3.csv("results.csv", function(error, data) {
-            // Prints the error in case something goes wrong
-            if (error) {
-                console.log(error);
-            }
-            // Everything goes ok!
-            else {
-                activeDrivers = []; // Will Contain all active drivers inside the csv file
-                retiredDrivers = []; // Will contain all retired drivers inside the csv file
-                data.forEach(function(d) { // Cycles through the data
-                    d.surname = d.surname.replace(/[\s.']/g, '_'); // Removes eventual spaces in the surnames
-                    d.name = d.name.replace(/[\s.']/g, '_'); // Removes eventual spaces in the names
-                    driver = new Driver(d.surname, d.name);
-                    if (d.year == 2019 && !contains(activeDrivers, driver)) {
-                        activeDrivers.push(driver);
-                        index = contains(retiredDrivers, driver);
-                        if (index) {
-                            retiredDrivers.splice(index-1, 1);
+        d3.queue()
+            .defer(d3.csv, "results.csv")
+            .defer(d3.csv, "qualifying.csv")
+            .await(function(error, data, data2) {
+                // Prints the error in case something goes wrong
+                if (error) {
+                    console.log(error);
+                }
+                // Everything goes ok!
+                else {
+                    // Sort all the drivers in two list: one for the recent ones, the other for the past drivers
+                    activeDrivers = []; // Will Contain all active drivers inside the csv file
+                    retiredDrivers = []; // Will contain all retired drivers inside the csv file
+                    data.forEach(function(d) { // Cycles through the data
+                        d.surname = d.surname.replace(/[\s.']/g, '_'); // Removes eventual spaces in the surnames
+                        d.name = d.name.replace(/[\s.']/g, '_'); // Removes eventual spaces in the names
+                        driver = new Driver(d.surname, d.name);
+                        if (d.year == 2019 && !contains(activeDrivers, driver)) {
+                            activeDrivers.push(driver);
+                            index = contains(retiredDrivers, driver);
+                            if (index) {
+                                retiredDrivers.splice(index-1, 1);
+                            }
                         }
-                    }
-                    else if (d.year >= 1996 && !contains(retiredDrivers, driver) && !contains(activeDrivers, driver)) {
-                        retiredDrivers.push(driver);
-                    }
-                });
-                activeDrivers.sort(function(a, b){
-                    if(a.surname < b.surname) { return -1; }
-                    if(a.surname > b.surname) { return 1; }
-                    return 0;
-                });
-                retiredDrivers.sort(function(a, b){
-                    if(a.surname < b.surname) { return -1; }
-                    if(a.surname > b.surname) { return 1; }
-                    return 0;
-                });
+                        else if (d.year >= 1996 && !contains(retiredDrivers, driver) && !contains(activeDrivers, driver)) {
+                            retiredDrivers.push(driver);
+                        }
+                    });
+                    
+                    data2.forEach(function(d) { // Cycles through the qualifying data
+                        d.surname = d.surname.replace(/[\s.']/g, '_'); // Removes eventual spaces in the surnames
+                        d.name = d.name.replace(/[\s.']/g, '_'); // Removes eventual spaces in the names
+                    });
+                    
+                    // Sort all drivers in alphabetical order
+                    activeDrivers.sort(function(a, b) {
+                        if (a.surname < b.surname) { 
+                            return -1; 
+                        }
+                        if (a.surname > b.surname) { 
+                            return 1; 
+                        }
+                        return 0;
+                    });
+                    retiredDrivers.sort(function(a, b){
+                        if (a.surname < b.surname) { 
+                            return -1; 
+                        }
+                        if (a.surname > b.surname) {
+                            return 1; 
+                        }
+                        return 0;
+                    });
                 
-                addDriversToTitle(); // Adds the events to the user's selections in the title now that the data is loaded
-                enableInputsToTitle(data);
-            }
-        });
+                    addDriversToTitle(); // Adds the events to the user's selections in the title now that the data is loaded
+                    enableInputsToTitle(data, data2);
+                }
+            });
     }
     
     // Adds the correct list of drivers to the selection
@@ -188,7 +209,7 @@
     }
     
     // Adds events to the interactions of the user with the title screen
-    function enableInputsToTitle(data) {
+    function enableInputsToTitle(data, data2) {
         document.getElementById("active-drivers").onclick = function() {
             showActiveDrivers = true;
             document.getElementById("search").disabled = true; // Disables the search button
@@ -222,23 +243,24 @@
             if (showActiveDrivers) {
                 surname = activeDrivers[value-1].surname;
                 name = activeDrivers[value-1].name;
-                initializeChartsLayout(data, surname, name);
+                initializeChartsLayout(data, data2, surname, name);
             }
             else {
                 surname = retiredDrivers[value-1].surname;
                 name = retiredDrivers[value-1].name;
-                initializeChartsLayout(data, surname, name);
+                initializeChartsLayout(data, data2, surname, name);
             }
         }    
     }
     
     // Prepares the layouts of the charts before plotting data on them
-    function initializeChartsLayout(data, surname, name) {
+    function initializeChartsLayout(data, data2, surname, name) {
         // Removes the previous layout and restores global variables
         if (document.body.contains(wrapper)) {
             wrapper.remove();
         }
         showTotalPoints = true;
+        showWinsInRaces = true;
         
         // Initializes the middle wrapper
         wrapper = document.createElement('div');
@@ -248,7 +270,7 @@
         
         // Prepares all the layouts
         preparePointsAchieved(data, surname, name);    
-        prepareComparisons(data, surname, name);
+        prepareComparisons(data, data2, surname, name);
     }
     
     // Prepares the layout for the points achieved chart
@@ -649,7 +671,7 @@
     }
     
     // Prepares the layout for the comparisons with teammates chart
-    function prepareComparisons(data, surname, name) {
+    function prepareComparisons(data, data2, surname, name) {
         // Initializes the div that contains the svg area for the comparisons   
         svgCmpDiv = document.createElement('div');
         svgCmpDiv.id = "comparisons";
@@ -692,6 +714,15 @@
         optionsDiv.appendChild(label);
         document.getElementById("show-races").checked = true;
         
+         document.getElementById('show-races').onclick = function() {
+            showWinsInRaces = true;
+            plotComparisons(data, data2, surname, name);
+        }
+        document.getElementById('show-quali').onclick = function() {
+            showWinsInRaces = false;
+            plotComparisons(data, data2, surname, name);
+        }
+        
         // Initializes the div for the points bar graph legend
         svgCmpLegendDiv = document.createElement('div');
         svgCmpLegendDiv.innerHTML = "Legend Table<br>";
@@ -709,16 +740,22 @@
                     .attr("id","cmplegendtable");
         
         // Plots a bar graph that shows the comparisons with teammates
-        plotComparisons(data, surname, name);
+        plotComparisons(data, data2, surname, name);
     }
     
     // Plots a bar graph that shows the comparisons with teammates
-    function plotComparisons(data, surname, name) {
+    function plotComparisons(data, data2, surname, name) {
         // Erase previous data
         cmpSvg.selectAll('*').remove();
         
         // Finds the relevant data to plot
-        relevantData = findWinsAgainstTeammates(data, surname, name);
+        relevantData = [];
+        if (showWinsInRaces) {
+            relevantData = findWinsAgainstTeammates(data, surname, name);
+        }
+        else {
+            relevantData = findWinsAgainstTeammates(data2, surname, name);
+        }
         
         // Initializes the x scale
         minYear = relevantData[0].key.substring(0, 4);
@@ -793,22 +830,35 @@
             .attr("dy","-2.5em")
             .style("text-anchor","end")
             .style("font", "12px times")
-            .text("Wins In Races");
+            .text(function(d) {
+                if (showWinsInRaces) {
+                    return "Wins In Races";
+                }
+                else {
+                    return "Wins In Qualy";
+                }
+            });
         
         // Appends the bottom y axis
-        abc = cmpSvg.append("g")
+        cmpSvg.append("g")
             .attr("transform", "translate(0," + (chart_dimensions.height)/2 + ")")
             .attr("class","yBottom_axis")
             .call(yBottomAxis); 
         cmpSvg.append("text")
             .attr("class","label")
-            //.attr("transform","rotate(-90)")
             .attr("transform", "translate(0," + (chart_dimensions.height) + ")" + "rotate(-90)")
             .attr("y", 6)
             .attr("dy","-2.5em")
             .style("text-anchor","start")
             .style("font", "12px times")
-            .text("Losses In Races");
+            .text(function(d) {
+                if (showWinsInRaces) {
+                    return "Losses In Qualy";
+                }
+                else {
+                    return "Losses In Qualy";
+                }
+            });
         
         // Plot the data
         teammates = []; // Contains the list of drivers involved in the comparison
