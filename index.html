@@ -49,7 +49,7 @@
     function contains(drivers, driver) {
         for (i = 0; i < drivers.length; i++) {
             currentDriver = drivers[i];
-            if (drivers[i].name == driver.name && drivers[i].surname == driver.surname) {
+            if (drivers[i].concatName == driver.concatName) {
                 return i+1; 
             }
         }
@@ -1012,6 +1012,22 @@
             .text(function(d) {
                 return d.replace(/_/g, ' ');
             });
+        
+         /*legend
+            .on("mouseover", function(d) {
+                // Highlights the entry in the legend and outlines the right bars
+                d3.select(".rect"+d)
+                    .attr("stroke", "black");
+                d3.select(".text"+d)
+                    .attr("text-decoration", "underline overline");                        
+            })
+            .on("mouseout", function(d) {
+                // Restores everything
+                d3.select(".rect"+d)
+                    .attr("stroke", "none");
+                d3.select(".text"+d)
+                    .attr("text-decoration", "none");
+            }); */
     }
     
     // Draws on the svg a label near the mouse location
@@ -1188,7 +1204,8 @@
             })
             .entries(newTuples);   
                 
-        console.log(relevantData);
+        /* DEBUG
+        console.log(relevantResults); */
         return relevantData;
     }
         
