@@ -72,6 +72,17 @@
     animation-timing-function: ease-in;
     animation-duration: 2s;
 }  
+#bottomwrapper {
+    display: flex;
+    border: 3px solid black;
+    border-top: 0px;
+    width: fit-content;
+    text-align: center;
+    animation-name: fadeInOpacity;
+    animation-iteration-count: 1;
+    animation-timing-function: ease-in;
+    animation-duration: 2s;
+}  
 #bargraph {
     padding-top: 6px;
     display: inline-block;
@@ -82,16 +93,21 @@
     display: inline-block;
     text-align: center;
 }
-#cmplegendtable {
-    padding-top: 6px;
-    display: inline-block;
-    text-align: center;
-}
 #comparisons {
     padding-top: 6px;
     display: inline-block;
     text-align: center;
     border-left: 3px solid black;
+}
+#cmplegendtable {
+    padding-top: 6px;
+    display: inline-block;
+    text-align: center;
+}
+#dnf {
+    padding-top: 6px;
+    display: inline-block;
+    text-align: center;
 }
             
 @keyframes fadeInOpacity {

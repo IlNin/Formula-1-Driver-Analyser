@@ -9,28 +9,38 @@
     
     <body>
     <script charset="utf-8">  
-    // Global variables
-    var container_dimensions = {width: 550, height: 250}; 
+    // Dimensions
     var margins = {top: 20, right: 10, bottom: 40, left: 45};
+    var container_dimensions = {width: 550, height: 250}; 
     var chart_dimensions = {
-            width: container_dimensions.width - margins.left - margins.right,
-            height: container_dimensions.height - margins.top - margins.bottom
+        width: container_dimensions.width - margins.left - margins.right,
+        height: container_dimensions.height - margins.top - margins.bottom
+    };
+    var small_container_dimensions = {width: 350, height: 250};
+    var small_chart_dimensions = {
+        width: small_container_dimensions.width - margins.left - margins.right,
+        height: small_container_dimensions.height - margins.top - margins.bottom
     };
     var barSize = 30;
     var legend_width = 119;
     
+    // Divs
     var wrapper;
+    var bottomWrapper;
     var barSvg; // Svg for the points bars
     var svgLegend;
     
+    // User inputs
     var showActiveDrivers = true; // Flag that indicates to show only active drivers
     var showTotalPoints = true; // Flag that indicates to show the total points instead of the average per race
     var showWinsInRaces = true; // Flag that indicates to show the wins in races instead of qualifying
     
+    // Drivers data
     var activeDrivers = []; // List of drivers loaded by the data that are active
     var retiredDrivers = []; // List of drivers loaded by the data that are retired
     var selectedDriver = "";
     
+    // Avg line parameters
     var barsClicked = []; // List of bars clicked in the total points chart
     var nBarsClicked = 0;
     var cumulativePoints = 0;
@@ -135,7 +145,7 @@
                                 retiredDrivers.splice(index, 1);
                             }
                         }
-                        else if (d.year >= 1996 && !retiredDrivers.includes(driver) && !activeDrivers.includes(driver)) {
+                        else if (d.year >= 1994 && !retiredDrivers.includes(driver) && !activeDrivers.includes(driver)) {
                             retiredDrivers.push(driver);
                         }
                     });
@@ -239,6 +249,7 @@
         // Removes the previous layout and restores global variables
         if (document.body.contains(wrapper)) {
             wrapper.remove();
+            bottomWrapper.remove();
             document.getElementById("selecteddriver").remove();
         }
         showTotalPoints = true;
@@ -256,9 +267,18 @@
         wrapper.innerHTML += "<br>";
         document.body.append(wrapper);
         
-        // Prepares all the layouts
+        // Prepares all the layouts in the middle wrapper
         preparePointsAchieved(data);    
         prepareComparisons(data, data2);
+        
+        // Initializes the bottom wrapper
+        bottomWrapper = document.createElement('div');
+        bottomWrapper.id = "bottomwrapper";
+        bottomWrapper.innerHTML += "<br>";
+        document.body.append(bottomWrapper);
+        
+        // Prepares all the layouts in the bottom wrapper
+        prepareDNF(data);
     }
     
     // Prepares the layout for the points achieved chart
@@ -486,6 +506,10 @@
                 
                 // Handles inputs                 
                 bar.on("mouseover", function(d) {  
+                    if (nBarsClicked == 0) {
+                        d3.select(this)
+                            .style("stroke", "black");
+                    }
                     // Draws a label with information about the bar
                     coords = d3.mouse(this);
                     classLength = d3.select(this).attr("class").length;
@@ -495,7 +519,11 @@
                     drawOnMouseOverLabel(coords, barSvg, text, colors(constructor), year, minYear, maxYear);
                 });
                    
-                bar.on("mouseout", function(d) {              
+                bar.on("mouseout", function(d) {      
+                    if (nBarsClicked == 0) {
+                        d3.select(this)
+                            .style("stroke", "none");
+                    }
                     // Removes the label with information about the bar
                     d3.select(".rect_label")
                         .remove();
@@ -516,19 +544,17 @@
                     // Gives them a stroke if they have been selected for the first time, otherwise removes the previous stroke
                     add = true; // Flag that indicates if to increase or decrease the total number of points across the season 
                     selection
-                        .attr("stroke", function(d) {
+                        .style("stroke", function(d) {
                             currentClass = d3.select(this).attr("class");
                             if (!barsClicked.includes(currentClass)) {
-                                // console.log("Adding: " + currentClass);
                                 barsClicked.push(currentClass);
                                 return "black";
                             }
                             else {
                                 add = false;
-                                // console.log("Removing: " + currentClass);
                                 index = barsClicked.indexOf(currentClass);
                                 barsClicked.splice(index, 1);
-                                return "null";
+                                return "none";
                             }
                         })
                         .style("opacity", function(d) {
@@ -638,7 +664,7 @@
                     .attr("text-decoration", "underline overline");
                 if (nBarsClicked == 0) {
                     barSvg.selectAll("[class*=" + d + "]")
-                        .attr("stroke", "black");        
+                        .style("stroke", "black");        
                 }
             })
             .on("mouseout", function(d) {
@@ -649,7 +675,7 @@
                     .attr("text-decoration", "none");
                 if (nBarsClicked == 0) {
                     barSvg.selectAll("[class*=" + d + "]")
-                        .attr("stroke", "none"); 
+                        .style("stroke", "none"); 
                 }
             });
     }
@@ -933,6 +959,10 @@
               
                 // Handles inputs
                 bar.on("mouseover", function(d) {
+                    // Outlines the bar
+                    d3.select(this)
+                        .style("stroke", "black");
+                
                     // Draws a label with information about the bar
                     coords = d3.mouse(this);
                     id = d3.select(this).attr("class");
@@ -953,6 +983,9 @@
                 });
                 
                 bar.on("mouseout", function(d) {
+                    // Restores everything
+                    d3.select(this)
+                        .style("stroke", "white");
                     d3.select(".rect_label")
                         .remove();
                 });             
@@ -1037,6 +1070,28 @@
                     initializeChartsLayout(data, data2);
                 }
             });
+    }
+    
+    // Prepares the layout for the chart that displays the causes of DNFs
+    function prepareDNF(data) {
+        // Initializes the div that contains the svg area for the comparisons   
+        svgDNFDiv = document.createElement('div');
+        svgDNFDiv.id = "dnf";
+        svgDNFDiv.innerHTML = "<b>Causes of DNFs</b><br>";
+        svgDNFDiv.onmouseover = function() {
+            writeOnAbout(3);
+        }
+        bottomWrapper.append(svgDNFDiv); 
+        
+        // Initalizes an empty svg for the points bars
+        dnfSvg = d3.select('#dnf')
+            .append('svg')
+                .attr("width", small_container_dimensions.width)
+                .attr("height", small_container_dimensions.height)
+                //.style("background-color", "red")
+            .append("g")
+                .attr("transform", "translate(" + margins.left + "," + margins.top + ")")
+                .attr("id", "bargraph");
     }
     
     // Draws on the svg a label near the mouse location
