@@ -1134,12 +1134,12 @@
         if (maxValue == 0) {
             maxValue = 1;
         }
-        x = d3.scaleLinear()
+        xDNF = d3.scaleLinear()
             .domain([0, maxValue])
             .range([0, small_chart_dimensions.width])
 
         // Initializes the y scale;
-        y = d3.scaleBand()
+        yDNF = d3.scaleBand()
             .domain(sortedRelevantData.map(function(d) {
                 return d.key;
              }))
@@ -1147,8 +1147,8 @@
             .padding(1);
         
         // Initializes the axis
-        xAxis = d3.axisBottom(x).ticks().tickFormat(d3.format("d"));
-        yAxis = d3.axisLeft(y).ticks();
+        xAxis = d3.axisBottom(xDNF).ticks().tickFormat(d3.format("d"));
+        yAxis = d3.axisLeft(yDNF).ticks();
         
         // Appends the x axis
         dnfSvg.append("g")
@@ -1165,22 +1165,21 @@
         sortedRelevantResults.sort(function(x, y) {
             return d3.descending(x.value, y.value);
         });
-        console.log(sortedRelevantResults);
         
         // Plot the lines
         lines = dnfSvg.selectAll("myline")
             .data(sortedRelevantData)
             .enter()
             .append("line")
-                .attr("x1", x(0))
-                .attr("x2", x(0))
+                .attr("x1", xDNF(0))
+                .attr("x2", xDNF(0))
                 .attr("y1", function(d) { 
-                    return y(d.key); 
+                    return yDNF(d.key); 
                 })
                 .attr("y2", function(d) { 
-                    return y(d.key); 
+                    return yDNF(d.key); 
                 })
-                .attr("stroke", "black")
+                .style("stroke", "black");
         
         // Plot the circles
         circles = dnfSvg.selectAll("mycircle")
@@ -1188,27 +1187,40 @@
             .enter()
             .append("circle")
                 .attr("cx", function(d) { 
-                    return x(d.value); 
+                    return xDNF(d.value); 
                 })
                 .attr("cy", function(d) { 
-                    return y(d.key); 
+                    return yDNF(d.key); 
                 })
                 .attr("r", "4")
                 .style("fill", "#69b3a2")
                 .style("opacity", 0)
-                .attr("stroke", "black") 
+                .style("stroke", "black") 
         
         // Handles the animations
         lines.transition()
             .duration(2000)
             .attr("x1", function(d) { 
-                    return x(d.value);
-                });
-        
+                    return xDNF(d.value);
+                });   
         circles.transition()
             .duration(2000)
             .delay(1500)
             .style("opacity", 1);
+        
+        // Handles the inputs
+        circles.on("mouseover", function(d) {
+            d3.select(this).attr("r", "6");
+            coords = d3.mouse(this);
+            ratio = ((d.value)*100)/relevantData[0].value;
+            text = "[" + d.key.substring(0, 3) + ": " + d.value + " (" + ratio.toFixed(2) + "% of the races)] ";
+            drawOnMouseOverLabel(coords, dnfSvg, text, "black", d.value, 0, maxValue);
+        });
+        circles.on("mouseout", function(d) {
+            d3.select(this).attr("r", "4");
+            d3.select(".rect_label")
+                .remove();
+        });
         
         // Adds the stats under the graph
         finishesRatio = (relevantData[1].value*100)/relevantData[0].value;
@@ -1260,7 +1272,10 @@
             about.innerHTML = "This bar chart shows the total points achieved by the selected driver per season. The user can also switch to the avg. points per race (per season) and interact with the bars by clicking them to calculate new averages on-the-fly.";
         }
         else if (index == 2) {
-            about.innerHTML = "This bar charts shows how many times the selected driver has placed better than their teammates across the seasons. The user can also switch between race and qualifying results and interact with the legend to select a new driver.";
+            about.innerHTML = "This bar chart shows how many times the selected driver has placed better than their teammates across the seasons. The user can also switch between race and qualifying results and interact with the legend to select a new driver.";
+        }
+        else if (index == 3) {
+            about.innerHTML = "This lollipop chart shows the causes of DNFs. 'Physical' includes cases of external damage to the car (tyre punctures, broken wings etc.), while 'Mechanical' includes damage to the internal components."; 
         }
         else {
             about.innerHTML = index;
