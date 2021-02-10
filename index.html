@@ -18,17 +18,20 @@
     };
     var small_container_dimensions = {width: 350, height: 250};
     var small_chart_dimensions = {
-        width: small_container_dimensions.width - margins.left - margins.right,
+        width: small_container_dimensions.width - margins.left - (margins.right + 30),
         height: small_container_dimensions.height - margins.top - margins.bottom
     };
     var barSize = 30;
     var legend_width = 119;
     
-    // Divs
+    // Divs and svgs
     var wrapper;
     var bottomWrapper;
     var barSvg; // Svg for the points bars
     var svgLegend;
+    var cmpSvg;
+    var svgCmpLegend;
+    var dnfSvg;
     
     // User inputs
     var showActiveDrivers = true; // Flag that indicates to show only active drivers
@@ -39,6 +42,8 @@
     var activeDrivers = []; // List of drivers loaded by the data that are active
     var retiredDrivers = []; // List of drivers loaded by the data that are retired
     var selectedDriver = "";
+    var minYear;
+    var maxYear;
     
     // Avg line parameters
     var barsClicked = []; // List of bars clicked in the total points chart
@@ -1090,8 +1095,65 @@
                 .attr("height", small_container_dimensions.height)
                 //.style("background-color", "red")
             .append("g")
-                .attr("transform", "translate(" + margins.left + "," + margins.top + ")")
+                .attr("transform", "translate(" + (margins.left+20) + "," + margins.top + ")")
                 .attr("id", "bargraph");
+        
+        // Plots the pie graph that displays data about the causes of DNFs
+        plotDNF(data);
+    }
+    
+    // Plots the lollipop graph that displays data about the causes of DNFs
+    function plotDNF(data) {
+         // Erase previous data
+        dnfSvg.selectAll('*').remove();
+        
+        // Finds the relevant data to plot
+        relevantData = findDNFs(data, minYear, maxYear);
+        
+        // Initializes the x scale
+        maxValue = 0;
+        if (relevantData.mechanical >= relevantData.physical) {
+            maxValue = relevantData.mechanical;
+        }
+        else {
+            maxValue = relevantData.physical;
+        }
+        x = d3.scaleLinear()
+            .domain([0, maxValue])
+            .range([0, small_chart_dimensions.width])
+
+        // Initializes the y scale
+        categories = ["Mechanical", "Physical", "Retirement", "Wounds"];
+        y = d3.scaleBand()
+            .domain(categories)
+            .range([0, small_chart_dimensions.height])
+            .padding(1);
+        
+        // Initializes the axis
+        xAxis = d3.axisBottom(x).ticks().tickFormat(d3.format("d"));
+        yAxis = d3.axisLeft(y).ticks();
+        
+        // Appends the x axis
+        dnfSvg.append("g")
+            .attr("class","xDNF_axis")
+            .attr("transform", "translate(0,"+(small_chart_dimensions.height)+")")
+            .call(xAxis);
+        
+        // Appends the y axis
+        dnfSvg.append("g")
+            .attr("class","yDNF_axis")
+            .call(yAxis)
+        
+        // Circles
+        dnfSvg.selectAll("mycircle")
+            .data([relevantData])
+            .enter()
+            .append("circle")
+                .attr("cx", function(d) { return x(d.mechanical); })
+                .attr("cy", function(d) { return y("Mechanical"); })
+                .attr("r", "4")
+                .style("fill", "#69b3a2")
+                .attr("stroke", "black")
     }
     
     // Draws on the svg a label near the mouse location
@@ -1152,7 +1214,6 @@
             })
             .entries(data);
 
-        console.log(groupedResults);
         // Finds the results of the selected pilot
         relevantResults = [];
         for (i = 0; i < groupedResults.length; i++) {
@@ -1293,6 +1354,120 @@
                 
         /* DEBUG
         console.log(relevantData); */
+        
+        return relevantData;
+    }
+    
+    // Finds the reasons of DNFs for the selected driver
+    function findDNFs(data, minYear, maxYear) {
+        // Groups all the results by driver
+        groupedResults = d3.nest()
+            .key(function(d) {
+                return d.surname + "_" + d.name;
+            })
+            .entries(data);
+        
+        // Finds the all the finish states of the selected pilot in the form of new tuples
+        newTuples = [];
+        for (i = 0; i < groupedResults.length; i++) {
+            driverKey = groupedResults[i].key;
+            if (driverKey == selectedDriver) {
+                driverResults = groupedResults[i].values;
+                for (j = 0; j < driverResults.length; j++) {
+                    tuple = {
+                            year: driverResults[j].year,
+                            round: driverResults[j].round,
+                            grandprix: driverResults[j].grandprix,
+                            constructor: driverResults[j].constructor,
+                            status: driverResults[j].status
+                            }
+                    newTuples.push(tuple);
+                }
+            }
+        }
+        
+        // Transforms the data in the final form used by the chart
+        physicalDamage = ["Accident", "Collision", "Collision Damage", "Spun off", 
+                          "Puncture", "Suspension", "Tyre", "Front wing", 
+                          "Broken wing", "Tyre puncture", "Rear wing", "Physical", 
+                          "Damage"];
+        retiredReasons = ["Retired", "Disqualified", "Did not qualify", "Safety", 
+                          "Not classified", "Not restarted", "Safety concerns", "Excluded"];
+        driverWounds = ["Injured", "Injury", "Driver unwell", "Fatal accident"];
+        relevantData = d3.nest()
+            .key(function(d) {
+                return d.year;
+            })
+            .rollup(function(d) {
+                return {
+                    count: d3.sum(d, function(g) {
+                        return 1;
+                    }),
+                    finished: d3.sum(d, function(g) {
+                        if (g.status == "Finished" || g.status.substring(0, 1) == "+") {
+                            return 1;
+                        }
+                        return 0;
+                    }),
+                    retired: d3.sum(d, function(g) {
+                        if (retiredReasons.includes(g.status)) {
+                            return 1;
+                        }
+                        return 0;
+                    }),
+                    physical: d3.sum(d, function(g) {
+                        if (physicalDamage.includes(g.status)) {
+                            return 1;
+                        }
+                        return 0;
+                    }),
+                    mechanical: d3.sum(d, function(g) {
+                        if (g.status.substring(0, 1) != "+" && g.status != "Finished" && !retiredReasons.includes(g.status) && !physicalDamage.includes(g.status) && !driverWounds.includes(g.status)) {
+                            return 1;
+                        }
+                        return 0;
+                    }),
+                    wounds: d3.sum(d, function(g) {
+                        if (driverWounds.includes(g.status)) {
+                            return 1;
+                        }
+                        return 0;
+                    })
+               }
+            })
+            .entries(newTuples);  
+        
+        // Sum the results of the selected years before returning the results
+        countTotal = 0;
+        finishedTotal = 0;
+        retiredTotal = 0;
+        physicalTotal = 0;
+        mechanicalTotal = 0;
+        woundsTotal = 0;
+        for (i = 0; i < relevantData.length; i++) {
+            year = relevantData[i].key;
+            if (year >= minYear && year <= maxYear) {
+                values = relevantData[i].value;
+                countTotal += values.count;
+                finishedTotal += values.finished;
+                retiredTotal += values.retired;
+                physicalTotal += values.physical;
+                mechanicalTotal += values.mechanical;
+                woundsTotal += values.wounds;
+            }
+        }
+        relevantData = 
+            {
+            count: countTotal,
+            finished: finishedTotal,
+            retired: retiredTotal,
+            physical: physicalTotal,
+            mechanical: mechanicalTotal,
+            wounds: woundsTotal
+            }
+        
+        // DEBUG
+        console.log(relevantData);
         
         return relevantData;
     }
