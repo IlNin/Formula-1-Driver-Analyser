@@ -24,7 +24,7 @@
     var barSize = 30;
     var legend_width = 119;
     
-    // Divs and svgs
+    // Divs, elements and svgs
     var wrapper;
     var bottomWrapper;
     var barSvg; // Svg for the points bars
@@ -32,6 +32,7 @@
     var cmpSvg;
     var svgCmpLegend;
     var dnfSvg;
+    var labelTotalRaces;
     
     // User inputs
     var showActiveDrivers = true; // Flag that indicates to show only active drivers
@@ -1092,11 +1093,20 @@
         dnfSvg = d3.select('#dnf')
             .append('svg')
                 .attr("width", small_container_dimensions.width)
-                .attr("height", small_container_dimensions.height)
+                .attr("height", small_container_dimensions.height - 20)
                 //.style("background-color", "red")
             .append("g")
                 .attr("transform", "translate(" + (margins.left+20) + "," + margins.top + ")")
                 .attr("id", "bargraph");
+        
+        // Text under the lollipop graph
+        textDiv = document.createElement('div');
+        svgDNFDiv.appendChild(textDiv);
+        labelTotalRaces = document.createElement('label');
+        labelTotalRaces.style.fontSize = "14px";
+        labelTotalRaces.innerHTML = "Number of finishes: ";
+        textDiv.appendChild(labelTotalRaces);
+         
         
         // Plots the pie graph that displays data about the causes of DNFs
         plotDNF(data);
@@ -1107,25 +1117,32 @@
          // Erase previous data
         dnfSvg.selectAll('*').remove();
         
-        // Finds the relevant data to plot
+        // Finds the relevant data to plot and sorts it
         relevantData = findDNFs(data, minYear, maxYear);
+        sortedRelevantData = relevantData.slice(2, relevantData.length);
+        sortedRelevantData.sort(function(x, y) {
+            return d3.descending(x.value, y.value);
+        });
         
         // Initializes the x scale
         maxValue = 0;
-        if (relevantData.mechanical >= relevantData.physical) {
-            maxValue = relevantData.mechanical;
+        for (i = 0; i < sortedRelevantData.length; i++) {
+            if (sortedRelevantData[i].value > maxValue) {
+                maxValue = sortedRelevantData[i].value;
+            }
         }
-        else {
-            maxValue = relevantData.physical;
+        if (maxValue == 0) {
+            maxValue = 1;
         }
         x = d3.scaleLinear()
             .domain([0, maxValue])
             .range([0, small_chart_dimensions.width])
 
-        // Initializes the y scale
-        categories = ["Mechanical", "Physical", "Retirement", "Wounds"];
+        // Initializes the y scale;
         y = d3.scaleBand()
-            .domain(categories)
+            .domain(sortedRelevantData.map(function(d) {
+                return d.key;
+             }))
             .range([0, small_chart_dimensions.height])
             .padding(1);
         
@@ -1144,16 +1161,61 @@
             .attr("class","yDNF_axis")
             .call(yAxis)
         
-        // Circles
-        dnfSvg.selectAll("mycircle")
-            .data([relevantData])
+        sortedRelevantResults = relevantData.slice(2, relevantData.length);
+        sortedRelevantResults.sort(function(x, y) {
+            return d3.descending(x.value, y.value);
+        });
+        console.log(sortedRelevantResults);
+        
+        // Plot the lines
+        lines = dnfSvg.selectAll("myline")
+            .data(sortedRelevantData)
+            .enter()
+            .append("line")
+                .attr("x1", x(0))
+                .attr("x2", x(0))
+                .attr("y1", function(d) { 
+                    return y(d.key); 
+                })
+                .attr("y2", function(d) { 
+                    return y(d.key); 
+                })
+                .attr("stroke", "black")
+        
+        // Plot the circles
+        circles = dnfSvg.selectAll("mycircle")
+            .data(sortedRelevantData)
             .enter()
             .append("circle")
-                .attr("cx", function(d) { return x(d.mechanical); })
-                .attr("cy", function(d) { return y("Mechanical"); })
+                .attr("cx", function(d) { 
+                    return x(d.value); 
+                })
+                .attr("cy", function(d) { 
+                    return y(d.key); 
+                })
                 .attr("r", "4")
                 .style("fill", "#69b3a2")
-                .attr("stroke", "black")
+                .style("opacity", 0)
+                .attr("stroke", "black") 
+        
+        // Handles the animations
+        lines.transition()
+            .duration(2000)
+            .attr("x1", function(d) { 
+                    return x(d.value);
+                });
+        
+        circles.transition()
+            .duration(2000)
+            .delay(1500)
+            .style("opacity", 1);
+        
+        // Adds the stats under the graph
+        finishesRatio = (relevantData[1].value*100)/relevantData[0].value;
+        labelTotalRaces.innerHTML = "Number of finishes: " + relevantData[1].value + " (" + finishesRatio.toFixed(2) + "% of the races)<br>";
+        sumDNF = sortedRelevantData[0].value + sortedRelevantData[1].value + sortedRelevantData[2].value;
+        dnfRatio = (sumDNF*100)/relevantData[0].value;
+        labelTotalRaces.innerHTML += "Number of DNFs: " +  sumDNF + " (" + dnfRatio.toFixed(2) + "% of the races)";
     }
     
     // Draws on the svg a label near the mouse location
@@ -1390,10 +1452,9 @@
         physicalDamage = ["Accident", "Collision", "Collision Damage", "Spun off", 
                           "Puncture", "Suspension", "Tyre", "Front wing", 
                           "Broken wing", "Tyre puncture", "Rear wing", "Physical", 
-                          "Damage"];
+                          "Damage", "Injured", "Injury", "Driver unwell", "Fatal accident"];
         retiredReasons = ["Retired", "Disqualified", "Did not qualify", "Safety", 
                           "Not classified", "Not restarted", "Safety concerns", "Excluded"];
-        driverWounds = ["Injured", "Injury", "Driver unwell", "Fatal accident"];
         relevantData = d3.nest()
             .key(function(d) {
                 return d.year;
@@ -1422,13 +1483,7 @@
                         return 0;
                     }),
                     mechanical: d3.sum(d, function(g) {
-                        if (g.status.substring(0, 1) != "+" && g.status != "Finished" && !retiredReasons.includes(g.status) && !physicalDamage.includes(g.status) && !driverWounds.includes(g.status)) {
-                            return 1;
-                        }
-                        return 0;
-                    }),
-                    wounds: d3.sum(d, function(g) {
-                        if (driverWounds.includes(g.status)) {
+                        if (g.status.substring(0, 1) != "+" && g.status != "Finished" && !retiredReasons.includes(g.status) && !physicalDamage.includes(g.status)) {
                             return 1;
                         }
                         return 0;
@@ -1456,20 +1511,24 @@
                 woundsTotal += values.wounds;
             }
         }
-        relevantData = 
-            {
-            count: countTotal,
-            finished: finishedTotal,
-            retired: retiredTotal,
-            physical: physicalTotal,
-            mechanical: mechanicalTotal,
-            wounds: woundsTotal
-            }
+        
+        // Makes the final results
+        relevantResults = [];
+        tuple = {key: "count", value: countTotal};
+        relevantResults.push(tuple);
+        tuple = {key: "finished", value: finishedTotal};
+        relevantResults.push(tuple);
+        tuple = {key: "Retirement", value: retiredTotal};
+        relevantResults.push(tuple);
+        tuple = {key: "Physical", value: physicalTotal};
+        relevantResults.push(tuple);
+        tuple = {key: "Mechanical", value: mechanicalTotal};
+        relevantResults.push(tuple);
         
         // DEBUG
-        console.log(relevantData);
+        console.log(relevantResults);
         
-        return relevantData;
+        return relevantResults;
     }
         
     drawTitle();
