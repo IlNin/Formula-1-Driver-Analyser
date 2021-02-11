@@ -4,6 +4,7 @@
         <meta http-equiv="content-type" content="text/html;charset=utf-8">
         <title>Formula 1 Driver Analyser</title>
         <script type="text/javascript" src="d3.js" charset="utf-8"></script>
+        <script src="https://unpkg.com/d3-simple-slider"></script>
         <link rel="stylesheet" type="text/css" href="style.css"/>
 	</head>
     
@@ -16,7 +17,7 @@
         width: container_dimensions.width - margins.left - margins.right,
         height: container_dimensions.height - margins.top - margins.bottom
     };
-    var small_container_dimensions = {width: 350, height: 250};
+    var small_container_dimensions = {width: 400, height: 220};
     var small_chart_dimensions = {
         width: small_container_dimensions.width - margins.left - (margins.right + 30),
         height: small_container_dimensions.height - margins.top - margins.bottom
@@ -31,6 +32,7 @@
     var svgLegend;
     var cmpSvg;
     var svgCmpLegend;
+    var dnfTimeSliderSvg
     var dnfSvg;
     var labelTotalRaces;
     
@@ -151,7 +153,7 @@
                                 retiredDrivers.splice(index, 1);
                             }
                         }
-                        else if (d.year >= 1994 && !retiredDrivers.includes(driver) && !activeDrivers.includes(driver)) {
+                        else if (d.year >= 1996 && !retiredDrivers.includes(driver) && !activeDrivers.includes(driver)) {
                             retiredDrivers.push(driver);
                         }
                     });
@@ -257,6 +259,7 @@
             wrapper.remove();
             bottomWrapper.remove();
             document.getElementById("selecteddriver").remove();
+            document.getElementById("endingdiv").remove();
         }
         showTotalPoints = true;
         showWinsInRaces = true;
@@ -285,6 +288,17 @@
         
         // Prepares all the layouts in the bottom wrapper
         prepareDNF(data);
+        
+        // Appends the yellow ending div
+        endingDiv = document.createElement('div');
+        endingDiv.id = "endingdiv";
+        endingDiv.innerHTML = "- All data taken from: ";
+        link = document.createElement('a');
+        link.innerHTML = "https://www.kaggle.com/rohanrao/formula-1-world-championship-1950-2020";
+        link.setAttribute('href', "https://www.kaggle.com/rohanrao/formula-1-world-championship-1950-2020");
+        endingDiv.appendChild(link);
+        endingDiv.innerHTML += " -";
+        document.body.appendChild(endingDiv);
     }
     
     // Prepares the layout for the points achieved chart
@@ -1080,7 +1094,7 @@
     
     // Prepares the layout for the chart that displays the causes of DNFs
     function prepareDNF(data) {
-        // Initializes the div that contains the svg area for the comparisons   
+        // Initializes the div that contains the time slider and svg area for the dnf 
         svgDNFDiv = document.createElement('div');
         svgDNFDiv.id = "dnf";
         svgDNFDiv.innerHTML = "<b>Causes of DNFs</b><br>";
@@ -1088,6 +1102,19 @@
             writeOnAbout(3);
         }
         bottomWrapper.append(svgDNFDiv); 
+        
+        // Initializes an empty svg for the time slider
+        svgDNFTimeSliderDiv = document.createElement('div');
+        svgDNFTimeSliderDiv.id = "dnftimeslider";
+        svgDNFDiv.appendChild(svgDNFTimeSliderDiv);
+        dnfTimeSliderSvg = d3.select('#dnftimeslider')
+            .append('svg')
+                .attr("width", small_container_dimensions.width)
+                .attr("height", 55)
+                //.style("background-color", "red")
+            .append("g")
+                .attr("transform", "translate(" + (margins.left) + "," + margins.top + ")")
+                .attr("id", "dnftimeslider");
         
         // Initalizes an empty svg for the points bars
         dnfSvg = d3.select('#dnf')
@@ -1097,7 +1124,7 @@
                 //.style("background-color", "red")
             .append("g")
                 .attr("transform", "translate(" + (margins.left+20) + "," + margins.top + ")")
-                .attr("id", "bargraph");
+                .attr("id", "dnf");
         
         // Text under the lollipop graph
         textDiv = document.createElement('div');
@@ -1108,17 +1135,36 @@
         textDiv.appendChild(labelTotalRaces);
          
         
-        // Plots the pie graph that displays data about the causes of DNFs
-        plotDNF(data);
+        // Plots the timeslider and lollipop graph that displays data about the causes of DNFs
+        drawDNFTimeSlider(data);
+        plotDNF(data, minYear, maxYear);
     }
     
+    // Draws a time slider for the DNF lollipop chart
+    function drawDNFTimeSlider(data) {
+        // Creates and adds the time slider
+        sliderDNF = d3.sliderBottom()
+            .min(minYear)
+            .max(maxYear)
+            .width(small_chart_dimensions.width)
+            .tickFormat(d3.format('d'))
+            .ticks(5)
+            .default([minYear, maxYear])
+            .step(1)
+            .fill('#2196f3')
+            .on('onchange', val => {
+                plotDNF(data, val[0], val[1]);
+            });
+        dnfTimeSliderSvg.call(sliderDNF); 
+    }
+        
     // Plots the lollipop graph that displays data about the causes of DNFs
-    function plotDNF(data) {
+    function plotDNF(data, selectedMinYear, selectedMaxYear) {
          // Erase previous data
         dnfSvg.selectAll('*').remove();
         
         // Finds the relevant data to plot and sorts it
-        relevantData = findDNFs(data, minYear, maxYear);
+        relevantData = findDNFs(data, selectedMinYear, selectedMaxYear);
         sortedRelevantData = relevantData.slice(2, relevantData.length);
         sortedRelevantData.sort(function(x, y) {
             return d3.descending(x.value, y.value);
@@ -1179,7 +1225,8 @@
                 .attr("y2", function(d) { 
                     return yDNF(d.key); 
                 })
-                .style("stroke", "black");
+                .style("stroke", "black")
+                .style("stroke-width", 2);
         
         // Plot the circles
         circles = dnfSvg.selectAll("mycircle")
@@ -1213,7 +1260,7 @@
             d3.select(this).attr("r", "6");
             coords = d3.mouse(this);
             ratio = ((d.value)*100)/relevantData[0].value;
-            text = "[" + d.key.substring(0, 3) + ": " + d.value + " (" + ratio.toFixed(2) + "% of the races)] ";
+            text = "[" + d.key.substring(0, 3).toUpperCase() + ": " + d.value + " (" + ratio.toFixed(2) + "% of the races)] ";
             drawOnMouseOverLabel(coords, dnfSvg, text, "black", d.value, 0, maxValue);
         });
         circles.on("mouseout", function(d) {
