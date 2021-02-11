@@ -1151,6 +1151,11 @@
             .step(1)
             .fill('#2196f3')
             .on('onchange', val => {
+                if (val[0] > val[1]) {
+                    var swap = val[1];
+                    val[1] = val[0];
+                    val[0] = swap;
+                }
                 plotDNF(data, val[0], val[1]);
             });
         dnfTimeSliderSvg.call(sliderDNF); 
