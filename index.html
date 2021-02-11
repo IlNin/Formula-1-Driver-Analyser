@@ -24,19 +24,14 @@
     };
     var barSize = 30;
     var legend_width = 119;
+    var timeslider_height = 55;
     
     // Divs, elements and svgs
-    var wrapper;
-    var bottomWrapper;
-    var barSvg; // Svg for the points bars
-    var svgLegend;
-    var cmpSvg;
-    var svgCmpLegend;
-    var dnfTimeSliderSvg
-    var dnfSvg;
-    var consTimeSliderSvg;
-    var consSvg;
-    var labelTotalRaces;
+    var aboveWrapper, wrapper, bottomWrapper;
+    var barSvg, svgLegend;
+    var cmpSvg, svgCmpLegend;
+    var dnfTimeSliderSvg, dnfSvg, labelTotalRaces;
+    var consTimeSliderSvg, consSvg;
     
     // User inputs
     var showActiveDrivers = true; // Flag that indicates to show only active drivers
@@ -66,30 +61,30 @@
         document.body.appendChild(aboveWrapper);
         
         // Creates the div 'title' which contains text, selections and buttons
-        title = document.createElement('div');
+        var title = document.createElement('div');
         title.id = "title";
         title.innerHTML = "<h2>Formula 1 Driver Analyser</h2>";
         aboveWrapper.appendChild(title);   
         
         // Creates the div 'menu' which allows the user to select a driver
-        menu = document.createElement('div');
+        var menu = document.createElement('div');
         menu.id = "menu";
         aboveWrapper.appendChild(menu);
         
         // Adds radios button in order to distinguish between active and retired drivers
         menu.innerHTML += "Choose between drivers that are: ";
-        activeButton = document.createElement('input');
+        var activeButton = document.createElement('input');
         activeButton.type = 'radio';
         activeButton.name = 'drivers';
         activeButton.id = 'active-drivers';
         activeButton.value = "active";
-        label = document.createElement('label');
+        var label = document.createElement('label');
         label.innerHTML = "Active";
         menu.appendChild(activeButton);
         menu.appendChild(label);
         menu.innerHTML += "   ";
         
-        retiredButton = document.createElement('input');
+        var retiredButton = document.createElement('input');
         retiredButton.type = 'radio';
         retiredButton.name = 'drivers';
         retiredButton.id = 'retired-drivers';
@@ -103,10 +98,10 @@
         // Creates a selection for the drivers with a default option, and adds it to 'title'
         menu.innerHTML += "Please select a driver: ";
 
-        selectDriver = document.createElement('select');
+        var selectDriver = document.createElement('select');
         selectDriver.id = "select-driver";
         selectDriver.style.width = "150px";
-        defaultDriverOption = document.createElement('option');
+        var defaultDriverOption = document.createElement('option');
         defaultDriverOption.value = 0;
         defaultDriverOption.innerHTML = "- DRIVER -";
         selectDriver.appendChild(defaultDriverOption);
@@ -114,13 +109,13 @@
         menu.innerHTML += " ";
         
          // Creates the search button, makes it disabled and adds it to 'title'
-        searchButton = document.createElement('button');
+        var searchButton = document.createElement('button');
         searchButton.id = "search";
         searchButton.innerHTML = "Search data!";
         searchButton.disabled = true;
         menu.appendChild(searchButton);
         
-        about = document.createElement('div');
+        var about = document.createElement('div');
         about.id = "about";
         aboveWrapper.appendChild(about);
         writeOnAbout(0);
@@ -147,10 +142,10 @@
                     data.forEach(function(d) { // Cycles through the data
                         d.surname = d.surname.replace(/[\s.']/g, '_'); // Removes eventual spaces in the surnames
                         d.name = d.name.replace(/[\s.']/g, '_'); // Removes eventual spaces in the names
-                        driver = d.surname + "_" + d.name;
-                        if (d.year == 2019 && !activeDrivers.includes(driver)) {
+                        var driver = d.surname + "_" + d.name;
+                        if (d.year == 2020 && !activeDrivers.includes(driver)) {
                             activeDrivers.push(driver);
-                            index = retiredDrivers.indexOf(driver);
+                            var index = retiredDrivers.indexOf(driver);
                             if (index) {
                                 retiredDrivers.splice(index, 1);
                             }
@@ -195,7 +190,7 @@
     function addDriversToTitle() {
         if (showActiveDrivers) {
             for (i = 0; i < activeDrivers.length; i++) {
-                newDriverOption = document.createElement('option'); // Makes the new season a selectable option 
+                var newDriverOption = document.createElement('option'); // Makes the new season a selectable option 
                 newDriverOption.value = i+1;
                 newDriverOption.innerHTML = activeDrivers[i].replace(/_/g, ' ');
                 document.getElementById("select-driver").appendChild(newDriverOption);
@@ -203,7 +198,7 @@
         }
         else {
             for (i = 0; i < retiredDrivers.length; i++) {
-                newDriverOption = document.createElement('option'); // Makes the new season a selectable option 
+                var newDriverOption = document.createElement('option'); // Makes the new season a selectable option 
                 newDriverOption.value = i+1;
                 newDriverOption.innerHTML = retiredDrivers[i].replace(/_/g, ' ');
                 document.getElementById("select-driver").appendChild(newDriverOption);
@@ -217,7 +212,7 @@
             showActiveDrivers = true;
             document.getElementById("search").disabled = true; // Disables the search button
             document.getElementById("select-driver").value = 0; // Restore the driver selector to the default option
-            options = document.getElementById("select-driver").options.length; // Removes all options inside the selector bar the default one
+            var options = document.getElementById("select-driver").options.length; // Removes all options inside the selector bar the default one
             for (i = options-1; i > 0; i--) {
                 document.getElementById("select-driver").options[i] = null;
             }
@@ -227,7 +222,7 @@
             showActiveDrivers = false;
             document.getElementById("search").disabled = true; // Disables the search button
             document.getElementById("select-driver").value = 0; // Restore the driver selector to the default option
-            options = document.getElementById("select-driver").options.length; // Removes all options inside the selector bar the default one
+            var options = document.getElementById("select-driver").options.length; // Removes all options inside the selector bar the default one
             for (i = options-1; i > 0; i--) {
                 document.getElementById("select-driver").options[i] = null;
             }
@@ -242,7 +237,7 @@
             }
         }
         search.onclick = function() { // Checks if the user clicks the search button
-            value = document.getElementById("select-driver").value;
+            var value = document.getElementById("select-driver").value;
             if (showActiveDrivers) {
                 selectedDriver = activeDrivers[value-1];
                 initializeChartsLayout(data, data2);
@@ -267,7 +262,7 @@
         showWinsInRaces = true;
         
         // Appends the div with the name of the driver selected
-        driverSelectedDiv = document.createElement('div');
+        var driverSelectedDiv = document.createElement('div');
         driverSelectedDiv.id = "selecteddriver";
         driverSelectedDiv.innerHTML = "<b>- " + selectedDriver.replace(/_/g, ' ') + " -</b";
         document.body.appendChild(driverSelectedDiv);
@@ -293,10 +288,10 @@
         prepareConsistency(data);
         
         // Appends the yellow ending div
-        endingDiv = document.createElement('div');
+        var endingDiv = document.createElement('div');
         endingDiv.id = "endingdiv";
         endingDiv.innerHTML = "- All data taken from: ";
-        link = document.createElement('a');
+        var link = document.createElement('a');
         link.innerHTML = "https://www.kaggle.com/rohanrao/formula-1-world-championship-1950-2020";
         link.setAttribute('href', "https://www.kaggle.com/rohanrao/formula-1-world-championship-1950-2020");
         endingDiv.appendChild(link);
@@ -307,7 +302,7 @@
     // Prepares the layout for the points achieved chart
     function preparePointsAchieved(data) { 
         // Initializes the div that contains the svg area for the points bars    
-        svgDiv = document.createElement('div');
+        var svgDiv = document.createElement('div');
         svgDiv.id = "bargraph";
         svgDiv.innerHTML = "<b>Points Per Season</b><br>";
         svgDiv.onmouseover = function() {
@@ -326,21 +321,21 @@
                 .attr("id", "bargraph");
         
         // Adds radios button in order to switch between total points and average points per race
-        optionsDiv = document.createElement('div');
+        var optionsDiv = document.createElement('div');
         svgDiv.appendChild(optionsDiv);
         optionsDiv.innerHTML = "Show: ";
-        totalButton = document.createElement('input');
+        var totalButton = document.createElement('input');
         totalButton.type = 'radio';
         totalButton.name = 'points';
         totalButton.id = 'total-points';
         totalButton.value = "total";
-        label = document.createElement('label');
+        var label = document.createElement('label');
         label.innerHTML = "Total Points";
         optionsDiv.appendChild(totalButton);
         optionsDiv.appendChild(label);
         optionsDiv.innerHTML += "   ";
 
-        averageButton = document.createElement('input');
+        var averageButton = document.createElement('input');
         averageButton.type = 'radio';
         averageButton.name = 'points';
         averageButton.id = 'average-points';
@@ -407,7 +402,7 @@
         // Initializes the y scale
         maxPoints = 0;
         for (i = 0; i < relevantData.length; i++) {
-            points = 0;
+            var points = 0;
             for (j = 0; j < relevantData[i].values.length; j++) {
                 points += relevantData[i].values[j].value.totalPoints;
             }
@@ -1113,7 +1108,7 @@
         dnfTimeSliderSvg = d3.select('#dnftimeslider')
             .append('svg')
                 .attr("width", small_container_dimensions.width)
-                .attr("height", 55)
+                .attr("height", timeslider_height)
                 //.style("background-color", "red")
             .append("g")
                 .attr("transform", "translate(" + (margins.left) + "," + margins.top + ")")
@@ -1298,7 +1293,7 @@
         consTimeSliderSvg = d3.select('#constimeslider')
             .append('svg')
                 .attr("width", small_container_dimensions.width)
-                .attr("height", 55)
+                .attr("height", timeslider_height)
                 //.style("background-color", "red")
             .append("g")
                 .attr("transform", "translate(" + (margins.left) + "," + margins.top + ")")
@@ -1436,7 +1431,7 @@
                 return d.year + "_" + d.round + "_" + d.grandprix + "_" + d.constructor;
             })
             .entries(data);
-        
+
         // Extracts the results of the selected driver and his teammate (or even teammates) for each race
         relevantResults = [];
         newTuples = [];
@@ -1472,6 +1467,7 @@
                 }
             }
         }
+        console.log(newTuples);
         
         // Transforms the data in the final form used by the chart
         relevantData = d3.nest()
@@ -1490,7 +1486,8 @@
                         if (g.selectedDriverPosition == "\\N" && g.teammatePosition == "\\N") {
                             return 0;
                         }
-                        if (g.selectedDriverPosition < g.teammatePosition) {
+                        if (parseInt(g.selectedDriverPosition) < parseInt(g.teammatePosition)) {
+                            console.log(g.year+g.grandprix);
                             return 1;
                         }
                         return 0;
@@ -1503,9 +1500,9 @@
                             return 0;
                         }
                         if (g.selectedDriverPosition == "\\N" && g.teammatePosition == "\\N") {
-                            return 1;
+                            return 0;
                         }
-                        if (g.teammatePosition < g.selectedDriverPosition) {
+                        if (parseInt(g.teammatePosition) < parseInt(g.selectedDriverPosition)) {
                             return 1;
                         }
                         return 0;
@@ -1514,8 +1511,8 @@
             })
             .entries(newTuples);   
                 
-        /* DEBUG
-        console.log(relevantData); */
+        // DEBUG
+        console.log(relevantData);
         
         return relevantData;
     }
@@ -1625,8 +1622,8 @@
         tuple = {key: "Mechanical", value: mechanicalTotal};
         relevantResults.push(tuple);
         
-        // DEBUG
-        console.log(relevantResults);
+        /* DEBUG
+        console.log(relevantResults); */
         
         return relevantResults;
     }
