@@ -103,12 +103,16 @@
     display: inline-block;
     text-align: center;
 }
-#dnftimeslider {
-}
 #dnf {
     padding-top: 6px;
     display: inline-block;
     text-align: center;
+}
+#consistency {
+    padding-top: 6px;
+    display: inline-block;
+    text-align: center;
+    border-left: 3px solid black;
 }
 #endingdiv {
     background: yellow;

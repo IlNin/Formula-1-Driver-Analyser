@@ -17,7 +17,7 @@
         width: container_dimensions.width - margins.left - margins.right,
         height: container_dimensions.height - margins.top - margins.bottom
     };
-    var small_container_dimensions = {width: 400, height: 220};
+    var small_container_dimensions = {width: 450, height: 220};
     var small_chart_dimensions = {
         width: small_container_dimensions.width - margins.left - (margins.right + 30),
         height: small_container_dimensions.height - margins.top - margins.bottom
@@ -34,6 +34,8 @@
     var svgCmpLegend;
     var dnfTimeSliderSvg
     var dnfSvg;
+    var consTimeSliderSvg;
+    var consSvg;
     var labelTotalRaces;
     
     // User inputs
@@ -267,7 +269,7 @@
         // Appends the div with the name of the driver selected
         driverSelectedDiv = document.createElement('div');
         driverSelectedDiv.id = "selecteddriver";
-        driverSelectedDiv.innerHTML = "<b>" + selectedDriver.replace(/_/g, ' ') + "</b";
+        driverSelectedDiv.innerHTML = "<b>- " + selectedDriver.replace(/_/g, ' ') + " -</b";
         document.body.appendChild(driverSelectedDiv);
         
         // Initializes the middle wrapper
@@ -288,6 +290,7 @@
         
         // Prepares all the layouts in the bottom wrapper
         prepareDNF(data);
+        prepareConsistency(data);
         
         // Appends the yellow ending div
         endingDiv = document.createElement('div');
@@ -1275,6 +1278,41 @@
         sumDNF = sortedRelevantData[0].value + sortedRelevantData[1].value + sortedRelevantData[2].value;
         dnfRatio = (sumDNF*100)/relevantData[0].value;
         labelTotalRaces.innerHTML += "Number of DNFs: " +  sumDNF + " (" + dnfRatio.toFixed(2) + "% of the races)";
+    }
+    
+    // Prepares the layout for the chart that displays the consistency of the placements
+    function prepareConsistency(data) {
+        // Initializes the div that contains the time slider and svg area for the placements
+        svgConsDiv = document.createElement('div');
+        svgConsDiv.id = "consistency";
+        svgConsDiv.innerHTML = "<b>Placements' Consistency</b><br>";
+        svgConsDiv.onmouseover = function() {
+            writeOnAbout(4);
+        }
+        bottomWrapper.append(svgConsDiv); 
+        
+        // Initializes an empty svg for the time slider
+        svgConsTimeSliderDiv = document.createElement('div');
+        svgConsTimeSliderDiv.id = "constimeslider";
+        svgConsDiv.appendChild(svgConsTimeSliderDiv);
+        consTimeSliderSvg = d3.select('#constimeslider')
+            .append('svg')
+                .attr("width", small_container_dimensions.width)
+                .attr("height", 55)
+                //.style("background-color", "red")
+            .append("g")
+                .attr("transform", "translate(" + (margins.left) + "," + margins.top + ")")
+                .attr("id", "constimeslider");
+        
+        // Initalizes an empty svg for box plot
+        consSvg = d3.select('#cons')
+            .append('svg')
+                .attr("width", small_container_dimensions.width)
+                .attr("height", small_container_dimensions.height - 20)
+                //.style("background-color", "red")
+            .append("g")
+                .attr("transform", "translate(" + (margins.left+20) + "," + margins.top + ")")
+                .attr("id", "cons");
     }
     
     // Draws on the svg a label near the mouse location
