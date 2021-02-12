@@ -1388,17 +1388,15 @@
         var interQuantileRange = q3 - q1;
     
         
-        var min = q1 - 1.5 * interQuantileRange;
-        if (min < 1) {
-            min = 1;
-        }
+        var min = sortedRelevantResults[0];
         var max = q1 + 1.5 * interQuantileRange;
         var boxHeight = 25;
         var yCenter = 50;
         
-        /* DEBUG
+        // DEBUG
+        console.log(sortedRelevantResults);
         console.log("q1: " + q1 +", median: " + median +", q3: " + q3 + ", Interquantile Range: " + interQuantileRange);
-        console.log("Min: " + min + ", Max: " + max); */
+        console.log("Min: " + min + ", Max: " + max);
 
         // Draws the main horizontal line
         consSvg.append("line")
