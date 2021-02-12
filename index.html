@@ -1304,7 +1304,9 @@
                 .attr("transform", "translate(" + (margins.left) + "," + margins.top + ")")
                 .attr("id", "constimeslider");
         
-        svgConsDiv.appendChild(document.createTextNode("Show placements from: "));
+        svgConsDiv2 = document.createElement('div');
+        svgConsDiv.appendChild(svgConsDiv2);
+        svgConsDiv2.appendChild(document.createTextNode("Show placements from: "));
         var selectTrack = document.createElement('select');
         selectTrack.id = "select-track";
         selectTrack.style.width = "150px";
@@ -1312,7 +1314,7 @@
         defaultTrackOption.value = 0;
         defaultTrackOption.innerHTML = "- EVERY TRACK -";
         selectTrack.appendChild(defaultTrackOption);
-        svgConsDiv.append(selectTrack);
+        svgConsDiv2.appendChild(selectTrack);
         
         // Initalizes an empty svg for box plot
         consSvg = d3.select('#consistency')
