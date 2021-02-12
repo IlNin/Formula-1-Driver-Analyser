@@ -1387,16 +1387,19 @@
         var q3 = d3.quantile(sortedRelevantResults, .75);
         var interQuantileRange = q3 - q1;
     
-        
-        var min = sortedRelevantResults[0];
-        var max = q1 + 1.5 * interQuantileRange;
+       
+        var min = Math.round(q1 - 1.5 * interQuantileRange);
+        if (min < sortedRelevantResults[0]) {
+            min = sortedRelevantResults[0];
+        }
+        var max = Math.round(q1 + 1.5 * interQuantileRange);
         var boxHeight = 25;
         var yCenter = 50;
         
         // DEBUG
         console.log(sortedRelevantResults);
         console.log("q1: " + q1 +", median: " + median +", q3: " + q3 + ", Interquantile Range: " + interQuantileRange);
-        console.log("Min: " + min + ", Max: " + max);
+        console.log("Min: " + min + ", Max: " + max); 
 
         // Draws the main horizontal line
         consSvg.append("line")
@@ -1497,7 +1500,7 @@
             about.innerHTML = "This lollipop chart shows the causes of DNFs. 'Physical' includes cases of external damage to the car (tyre punctures, broken wings etc.), while 'Mechanical' includes damage to the internal components."; 
         }
         else if (index == 4) {
-            about.innerHTML = "This box-plot chart shows the distribution of selected driver's placements upon finishes. A quartile of the distribution falls in each of the four sections, meaning that the gray box represents 50% of the placements.";
+            about.innerHTML = "This box-plot chart shows the distribution of the placements upon finishes. A quartile of the distribution (outliers excluded) falls in each of the four sections, meaning that the gray box represents ~50% of the placements.";
         }
         else {
             about.innerHTML = index;
