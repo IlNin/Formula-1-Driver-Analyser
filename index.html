@@ -30,8 +30,8 @@
     var aboveWrapper, wrapper, bottomWrapper;
     var barSvg, svgLegend;
     var cmpSvg, svgCmpLegend;
-    var dnfTimeSliderSvg, dnfSvg, labelTotalRaces;
-    var consTimeSliderSvg, consSvg;
+    var dnfTimeSliderSvg, dnfSvg, labelTotalRacesDNF;
+    var consTimeSliderSvg, consSvg, labelTotalRacesCons;
     
     // User inputs
     var showActiveDrivers = true; // Flag that indicates to show only active drivers
@@ -129,6 +129,7 @@
         d3.queue()
             .defer(d3.csv, "results.csv")
             .defer(d3.csv, "qualifying.csv")
+            .defer(d3.csv, "driverStandings.csv")
             .await(function(error, data, data2) {
                 // Prints the error in case something goes wrong
                 if (error) {
@@ -1095,7 +1096,7 @@
         // Initializes the div that contains the time slider and svg area for the dnf 
         svgDNFDiv = document.createElement('div');
         svgDNFDiv.id = "dnf";
-        svgDNFDiv.innerHTML = "<b>Causes of DNFs</b><br>";
+        svgDNFDiv.innerHTML = "<b>DNFs' Causes</b><br>";
         svgDNFDiv.onmouseover = function() {
             writeOnAbout(3);
         }
@@ -1125,14 +1126,13 @@
                 .attr("id", "dnf");
         
         // Text under the lollipop graph
-        textDiv = document.createElement('div');
+        var textDiv = document.createElement('div');
         svgDNFDiv.appendChild(textDiv);
-        labelTotalRaces = document.createElement('label');
-        labelTotalRaces.style.fontSize = "14px";
-        labelTotalRaces.innerHTML = "Number of finishes: ";
-        textDiv.appendChild(labelTotalRaces);
-         
-        
+        labelTotalRacesDNF = document.createElement('label');
+        labelTotalRacesDNF.style.fontSize = "14px";
+        labelTotalRacesDNF.innerHTML = "Number of finishes: ";
+        textDiv.appendChild(labelTotalRacesDNF);
+              
         // Plots the timeslider and lollipop graph that displays data about the causes of DNFs
         drawDNFTimeSlider(data);
         plotDNF(data, minYear, maxYear);
@@ -1141,7 +1141,7 @@
     // Draws a time slider for the DNF lollipop chart
     function drawDNFTimeSlider(data) {
         // Creates and adds the time slider
-        sliderDNF = d3.sliderBottom()
+        var sliderDNF = d3.sliderBottom()
             .min(minYear)
             .max(maxYear)
             .width(small_chart_dimensions.width)
@@ -1163,7 +1163,7 @@
         
     // Plots the lollipop graph that displays data about the causes of DNFs
     function plotDNF(data, selectedMinYear, selectedMaxYear) {
-         // Erase previous data
+        // Erase previous data
         dnfSvg.selectAll('*').remove();
         
         // Finds the relevant data to plot and sorts it
@@ -1274,10 +1274,10 @@
         
         // Adds the stats under the graph
         finishesRatio = (relevantData[1].value*100)/relevantData[0].value;
-        labelTotalRaces.innerHTML = "Number of finishes: " + relevantData[1].value + " (" + finishesRatio.toFixed(2) + "% of the races)<br>";
+        labelTotalRacesDNF.innerHTML = "Number of finishes: " + relevantData[1].value + " (" + finishesRatio.toFixed(2) + "% of the races)<br>";
         sumDNF = sortedRelevantData[0].value + sortedRelevantData[1].value + sortedRelevantData[2].value;
         dnfRatio = (sumDNF*100)/relevantData[0].value;
-        labelTotalRaces.innerHTML += "Number of DNFs: " +  sumDNF + " (" + dnfRatio.toFixed(2) + "% of the races)";
+        labelTotalRacesDNF.innerHTML += "Number of DNFs: " +  sumDNF + " (" + dnfRatio.toFixed(2) + "% of the races)";
     }
     
     // Prepares the layout for the chart that displays the consistency of the placements
@@ -1285,7 +1285,7 @@
         // Initializes the div that contains the time slider and svg area for the placements
         svgConsDiv = document.createElement('div');
         svgConsDiv.id = "consistency";
-        svgConsDiv.innerHTML = "<b>Placements' Consistency</b><br>";
+        svgConsDiv.innerHTML = "<b>Placements' Consistency On Finishes</b><br>";
         svgConsDiv.onmouseover = function() {
             writeOnAbout(4);
         }
@@ -1305,14 +1305,150 @@
                 .attr("id", "constimeslider");
         
         // Initalizes an empty svg for box plot
-        consSvg = d3.select('#cons')
+        consSvg = d3.select('#consistency')
             .append('svg')
                 .attr("width", small_container_dimensions.width)
-                .attr("height", small_container_dimensions.height - 20)
+                .attr("height", (small_container_dimensions.height/2)+40)
                 //.style("background-color", "red")
             .append("g")
-                .attr("transform", "translate(" + (margins.left+20) + "," + margins.top + ")")
+                .attr("transform", "translate(" + (margins.left) + "," + margins.top + ")")
                 .attr("id", "cons");
+        
+        // Text under the boxplot graph
+        var textDiv = document.createElement('div');
+        svgConsDiv.appendChild(textDiv);
+        labelTotalRacesCons = document.createElement('label');
+        labelTotalRacesCons.style.fontSize = "14px";
+        labelTotalRacesCons.innerHTML = "Number of finishes: ";
+        textDiv.appendChild(labelTotalRacesCons);
+        
+        // Draws the time slider and the boxplot
+        drawConsistencyTimeSlider(data);
+        plotConsistency(data, minYear, maxYear);
+    }
+    
+    // Draws a time slider fot the consistency plot box
+    function drawConsistencyTimeSlider(data) {
+        // Creates and adds the time slider
+       var sliderConsistency = d3.sliderBottom()
+            .min(minYear)
+            .max(maxYear)
+            .width(small_chart_dimensions.width)
+            .tickFormat(d3.format('d'))
+            .ticks(5)
+            .default([minYear, maxYear])
+            .step(1)
+            .fill('#2196f3')
+            .on('onchange', val => {
+                if (val[0] > val[1]) {
+                    var swap = val[1];
+                    val[1] = val[0];
+                    val[0] = swap;
+                }
+                plotConsistency(data, val[0], val[1]);
+            });
+        consTimeSliderSvg.call(sliderConsistency); 
+    }
+    
+    // Plots the plot box with the placements of the driver
+    function plotConsistency(data, selectedMinYear, selectedMaxYear) {
+        // Erase previous data
+        consSvg.selectAll('*').remove();
+        
+        // Finds the relevant data to plot and sorts it
+        var relevantData = findPlacements(data, selectedMinYear, selectedMaxYear);
+        
+        // Initializes the x scale
+        xCons = d3.scaleLinear()
+            .domain([1, 22])
+            .range([0, small_chart_dimensions.width])
+            
+        // Initializes the axis
+        xAxis = d3.axisBottom(xCons).ticks(22).tickFormat(d3.format("d"));
+        
+        // Appends the x axis
+        consSvg.append("g")
+            .attr("class","xCons_axis")
+            .attr("transform", "translate(0,"+((small_chart_dimensions.height/2)+10)+")")
+            .call(xAxis);
+        consSvg.append("text")
+            .attr("class","label")
+            .attr("x", small_chart_dimensions.width)
+            .attr("y", ((small_chart_dimensions.height/2)+10)+(margins.bottom-10))
+            .style("text-anchor","end")
+            .text("Placements");
+        
+        // Finds the right values for the boxplot
+        sortedRelevantResults = relevantData.sort(function(x, y) {
+            return d3.ascending(x, y);
+        });
+        var q1 = d3.quantile(sortedRelevantResults, .25);
+        var median = d3.quantile(sortedRelevantResults, .5);
+        var q3 = d3.quantile(sortedRelevantResults, .75);
+        var interQuantileRange = q3 - q1;
+    
+        
+        var min = q1 - 1.5 * interQuantileRange;
+        if (min < 1) {
+            min = 1;
+        }
+        var max = q1 + 1.5 * interQuantileRange;
+        var boxHeight = 25;
+        var yCenter = 50;
+        
+        /* DEBUG
+        console.log("q1: " + q1 +", median: " + median +", q3: " + q3 + ", Interquantile Range: " + interQuantileRange);
+        console.log("Min: " + min + ", Max: " + max); */
+
+        // Draws the main horizontal line
+        consSvg.append("line")
+            .attr("x1", xCons(min))
+            .attr("x2", xCons(min))
+            .attr("y1", yCenter)
+            .attr("y2", yCenter)
+            .attr("stroke", "black")
+            .style("opacity", 0)
+            .transition()
+                .duration(2000)
+                .attr("x2", xCons(max))
+                .style("opacity", 1);
+
+        // Draws the box
+        consSvg.append("rect")
+            .attr("x", xCons(q1))
+            .attr("y", yCenter - boxHeight/2)
+            .attr("height", boxHeight)
+            .attr("width", (xCons(q3)-xCons(q1)))
+            .attr("stroke", "black")
+            .style("fill", "#69b3a2")
+            .style("opacity", 0)
+            .transition()
+                .duration(2000)
+                .delay(1500)
+                .style("opacity", 1);
+
+        // Draws median, min and max vertical lines
+        consSvg.selectAll("toto")
+            .data([min, median, max])
+            .enter()
+            .append("line")
+                .attr("x1", function(d) {
+                    return xCons(d);
+                })
+                .attr("x2", function(d) {
+                    return xCons(d);
+                })
+                .attr("y1", yCenter + boxHeight/2)
+                .attr("y2", yCenter - boxHeight/2)
+                .attr("stroke", "black")
+                .style("opacity", 0)
+                .transition()
+                    .duration(2000)
+                    .delay(1500)
+                    .style("opacity", 1);
+                
+        // Refreshes the counter
+        labelTotalRacesCons.innerHTML = "Number of finishes: " + relevantData.length + "<br>";
     }
     
     // Draws on the svg a label near the mouse location
@@ -1361,6 +1497,9 @@
         }
         else if (index == 3) {
             about.innerHTML = "This lollipop chart shows the causes of DNFs. 'Physical' includes cases of external damage to the car (tyre punctures, broken wings etc.), while 'Mechanical' includes damage to the internal components."; 
+        }
+        else if (index == 4) {
+            about.innerHTML = "This box-plot chart shows the distribution of selected driver's placements upon finishes. A quartile of the distribution falls in each of the four sections, meaning that the gray box represents 50% of the placements.";
         }
         else {
             about.innerHTML = index;
@@ -1472,7 +1611,6 @@
                 }
             }
         }
-        console.log(newTuples);
         
         // Transforms the data in the final form used by the chart
         relevantData = d3.nest()
@@ -1492,7 +1630,6 @@
                             return 0;
                         }
                         if (parseInt(g.selectedDriverPosition) < parseInt(g.teammatePosition)) {
-                            console.log(g.year+g.grandprix);
                             return 1;
                         }
                         return 0;
@@ -1516,8 +1653,8 @@
             })
             .entries(newTuples);   
                 
-        // DEBUG
-        console.log(relevantData);
+        /* DEBUG
+        console.log(relevantData); */
         
         return relevantData;
     }
@@ -1632,7 +1769,37 @@
         
         return relevantResults;
     }
+    
+    // Finds the placements of the selected driver
+    function findPlacements(data, minYear, maxYear) {
+        // Groups all the results by pilot
+        var groupedResults = d3.nest()
+            .key(function(d) {
+                return d.surname + "_" + d.name;
+            })
+            .entries(data);
         
+        // Finds the results of the selected pilot between the chosen range of years
+        var relevantResults = [];
+        for (i = 0; i < groupedResults.length; i++) {
+            var key = groupedResults[i].key;
+            if (key == selectedDriver) {
+                var values = groupedResults[i].values;
+                for (j = 0; j < values.length; j++) {
+                    if (values[j].year >= minYear && values[j].year <= maxYear && (values[j].status == "Finished" || values[j].status.substring(0, 1) == "+")) {
+                        relevantResults.push(parseInt(values[j].position));
+                    }
+                }
+            }
+        }
+        
+        /* DEBUG
+        console.log(relevantResults); */
+        
+        return relevantResults;   
+    }
+        
+    
     drawTitle();
     </script>
     </body>
