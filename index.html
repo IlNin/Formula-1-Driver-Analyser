@@ -1304,6 +1304,16 @@
                 .attr("transform", "translate(" + (margins.left) + "," + margins.top + ")")
                 .attr("id", "constimeslider");
         
+        svgConsDiv.appendChild(document.createTextNode("Show placements from: "));
+        var selectTrack = document.createElement('select');
+        selectTrack.id = "select-track";
+        selectTrack.style.width = "150px";
+        var defaultTrackOption = document.createElement('option');
+        defaultTrackOption.value = 0;
+        defaultTrackOption.innerHTML = "- EVERY TRACK -";
+        selectTrack.appendChild(defaultTrackOption);
+        svgConsDiv.append(selectTrack);
+        
         // Initalizes an empty svg for box plot
         consSvg = d3.select('#consistency')
             .append('svg')
@@ -1321,7 +1331,7 @@
         labelTotalRacesCons.style.fontSize = "14px";
         labelTotalRacesCons.innerHTML = "Number of finishes: ";
         textDiv.appendChild(labelTotalRacesCons);
-        
+ 
         // Draws the time slider and the boxplot
         drawConsistencyTimeSlider(data);
         plotConsistency(data, minYear, maxYear);
@@ -1449,7 +1459,7 @@
                     .style("opacity", 1);
                 
         // Refreshes the counter
-        labelTotalRacesCons.innerHTML = "Number of finishes: " + relevantData.length + "<br>";
+        labelTotalRacesCons.innerHTML = "Number of finishes: " + relevantData.length + "<br><br>";
     }
     
     // Draws on the svg a label near the mouse location
