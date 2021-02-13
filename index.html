@@ -37,13 +37,20 @@
     var showActiveDrivers = true; // Flag that indicates to show only active drivers
     var showTotalPoints = true; // Flag that indicates to show the total points instead of the average per race
     var showWinsInRaces = true; // Flag that indicates to show the wins in races instead of qualifying
+    var selectedTrackCons = 0;
+    var minYearSelectedCons = 0;
+    var maxYearSelectedCons = 0;
     
     // Drivers data
     var activeDrivers = []; // List of drivers loaded by the data that are active
     var retiredDrivers = []; // List of drivers loaded by the data that are retired
+    var circuits = []; // List of tracks where the selected driver has driven
+    var flagAddCircuits = 0;
     var selectedDriver = "";
     var minYear;
     var maxYear;
+    
+    
     
     // Avg line parameters
     var barsClicked = []; // List of bars clicked in the total points chart
@@ -261,7 +268,13 @@
         }
         showTotalPoints = true;
         showWinsInRaces = true;
+        circuits = [];
+        flagAddCircuits = 0;
         
+        selectedTrackCons = 0;
+        minYearSelectedCons = 0;
+        maxYearSelectedCons = 0;
+
         // Appends the div with the name of the driver selected
         var driverSelectedDiv = document.createElement('div');
         driverSelectedDiv.id = "selecteddriver";
@@ -1304,7 +1317,8 @@
                 .attr("transform", "translate(" + (margins.left) + "," + margins.top + ")")
                 .attr("id", "constimeslider");
         
-        svgConsDiv2 = document.createElement('div');
+        // Adds the track selector with input event
+        var svgConsDiv2 = document.createElement('div');
         svgConsDiv.appendChild(svgConsDiv2);
         svgConsDiv2.appendChild(document.createTextNode("Show placements from: "));
         var selectTrack = document.createElement('select');
@@ -1315,6 +1329,10 @@
         defaultTrackOption.innerHTML = "- EVERY TRACK -";
         selectTrack.appendChild(defaultTrackOption);
         svgConsDiv2.appendChild(selectTrack);
+        document.getElementById("select-track").onchange = function() { 
+            selectedTrackCons = this.value;
+            plotConsistency(data, minYearSelectedCons, maxYearSelectedCons, selectedTrackCons);
+        }
         
         // Initalizes an empty svg for box plot
         consSvg = d3.select('#consistency')
@@ -1335,8 +1353,10 @@
         textDiv.appendChild(labelTotalRacesCons);
  
         // Draws the time slider and the boxplot
+        minYearSelectedCons = minYear;
+        maxYearSelectedCons = maxYear;
         drawConsistencyTimeSlider(data);
-        plotConsistency(data, minYear, maxYear);
+        plotConsistency(data, minYearSelectedCons, maxYearSelectedCons, selectedTrackCons);
     }
     
     // Draws a time slider fot the consistency plot box
@@ -1357,18 +1377,27 @@
                     val[1] = val[0];
                     val[0] = swap;
                 }
-                plotConsistency(data, val[0], val[1]);
+                minYearSelectedCons = val[0];
+                maxYearSelectedCons = val[1];
+                plotConsistency(data, minYearSelectedCons, maxYearSelectedCons, selectedTrackCons);
             });
         consTimeSliderSvg.call(sliderConsistency); 
     }
     
     // Plots the plot box with the placements of the driver
-    function plotConsistency(data, selectedMinYear, selectedMaxYear) {
+    function plotConsistency(data, selectedMinYear, selectedMaxYear, selectedTrack) {
         // Erase previous data
         consSvg.selectAll('*').remove();
         
-        // Finds the relevant data to plot and sorts it
-        var relevantData = findPlacements(data, selectedMinYear, selectedMaxYear);
+        // Finds the relevant data
+        var relevantData = findPlacements(data, selectedMinYear, selectedMaxYear, selectedTrack);
+        
+        // Adds data about circuits if not already done
+        if (flagAddCircuits == 0) {
+            var selection = document.getElementById("select-track");
+            addCircuitsToSelection(selection);
+            flagAddCircuits = 1;
+        }
         
         // Initializes the x scale
         xCons = d3.scaleLinear()
@@ -1399,19 +1428,23 @@
         var q3 = d3.quantile(sortedRelevantResults, .75);
         var interQuantileRange = q3 - q1;
     
+        var min = sortedRelevantResults[0];
+        var max = sortedRelevantResults[sortedRelevantResults.length-1];
        
+        /* WITHOUT OUTLIERS
         var min = Math.round(q1 - 1.5 * interQuantileRange);
         if (min < sortedRelevantResults[0]) {
             min = sortedRelevantResults[0];
         }
-        var max = Math.round(q1 + 1.5 * interQuantileRange);
+        var max = Math.round(q1 + 1.5 * interQuantileRange); */
+        
         var boxHeight = 25;
         var yCenter = 50;
         
-        // DEBUG
+        /* DEBUG
         console.log(sortedRelevantResults);
         console.log("q1: " + q1 +", median: " + median +", q3: " + q3 + ", Interquantile Range: " + interQuantileRange);
-        console.log("Min: " + min + ", Max: " + max); 
+        console.log("Min: " + min + ", Max: " + max); */
 
         // Draws the main horizontal line
         consSvg.append("line")
@@ -1464,6 +1497,28 @@
         labelTotalRacesCons.innerHTML = "Number of finishes: " + relevantData.length + "<br><br>";
     }
     
+    // Adds the list of tracks to a selection
+    function addCircuitsToSelection(selection) {
+        // Reorder the circuits
+        circuits.sort(function(a, b) {
+            if (a < b) { 
+                return -1; 
+            }
+            if (a > b) { 
+                return 1; 
+            }
+            return 0;
+        });
+        
+        // Adds the reordered circuits to the selection
+        for (i = 0; i < circuits.length; i++) {
+            var newCircuitOption = document.createElement('option'); // Makes the new season a selectable option 
+            newCircuitOption.value = i+1;
+            newCircuitOption.innerHTML = circuits[i];
+            selection.appendChild(newCircuitOption);
+        }
+    }
+        
     // Draws on the svg a label near the mouse location
     function drawOnMouseOverLabel(coords, svg, text, color, place, minPlace, maxPlace) {
         // Each text label will be inside a black outlined rect in g
@@ -1784,7 +1839,7 @@
     }
     
     // Finds the placements of the selected driver
-    function findPlacements(data, minYear, maxYear) {
+    function findPlacements(data, minYear, maxYear, index) {
         // Groups all the results by pilot
         var groupedResults = d3.nest()
             .key(function(d) {
@@ -1792,15 +1847,26 @@
             })
             .entries(data);
         
-        // Finds the results of the selected pilot between the chosen range of years
+        // Finds the results of the selected pilot between the chosen range of years, and keeps track of the circuits
         var relevantResults = [];
         for (i = 0; i < groupedResults.length; i++) {
             var key = groupedResults[i].key;
             if (key == selectedDriver) {
                 var values = groupedResults[i].values;
                 for (j = 0; j < values.length; j++) {
+                    if (!circuits.includes(values[j].circuit)) {
+                        circuits.push(values[j].circuit);
+                    }
                     if (values[j].year >= minYear && values[j].year <= maxYear && (values[j].status == "Finished" || values[j].status.substring(0, 1) == "+")) {
-                        relevantResults.push(parseInt(values[j].position));
+                        if (index == 0) {
+                            relevantResults.push(parseInt(values[j].position));
+                        }
+                        else {
+                            currentTrack = circuits[index-1];
+                            if (values[j].circuit == currentTrack) {
+                                relevantResults.push(parseInt(values[j].position));
+                            }
+                        }
                     }
                 }
             }
