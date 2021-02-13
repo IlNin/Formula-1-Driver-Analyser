@@ -37,6 +37,11 @@
     var showActiveDrivers = true; // Flag that indicates to show only active drivers
     var showTotalPoints = true; // Flag that indicates to show the total points instead of the average per race
     var showWinsInRaces = true; // Flag that indicates to show the wins in races instead of qualifying
+    
+    var selectedTrackDNF = 0;
+    var minYearSelectedDNF = 0;
+    var maxYearSelectedDNF = 0;
+    
     var selectedTrackCons = 0;
     var minYearSelectedCons = 0;
     var maxYearSelectedCons = 0;
@@ -49,9 +54,7 @@
     var selectedDriver = "";
     var minYear;
     var maxYear;
-    
-    
-    
+
     // Avg line parameters
     var barsClicked = []; // List of bars clicked in the total points chart
     var nBarsClicked = 0;
@@ -259,22 +262,28 @@
     
     // Prepares the layouts of the charts before plotting data on them
     function initializeChartsLayout(data, data2) {
-        // Removes the previous layout and restores global variables
+        // Removes the previous layout
         if (document.body.contains(wrapper)) {
             wrapper.remove();
             bottomWrapper.remove();
             document.getElementById("selecteddriver").remove();
             document.getElementById("endingdiv").remove();
         }
+        
+        // Restores global variables
         showTotalPoints = true;
         showWinsInRaces = true;
         circuits = [];
         flagAddCircuits = 0;
         
+        selectedTrackDNF = 0;
+        minYearSelectedDNF = 0;
+        maxYearSelectedDNF = 0;
+        
         selectedTrackCons = 0;
         minYearSelectedCons = 0;
         maxYearSelectedCons = 0;
-
+        
         // Appends the div with the name of the driver selected
         var driverSelectedDiv = document.createElement('div');
         driverSelectedDiv.id = "selecteddriver";
@@ -1107,7 +1116,7 @@
     // Prepares the layout for the chart that displays the causes of DNFs
     function prepareDNF(data) {
         // Initializes the div that contains the time slider and svg area for the dnf 
-        svgDNFDiv = document.createElement('div');
+        var svgDNFDiv = document.createElement('div');
         svgDNFDiv.id = "dnf";
         svgDNFDiv.innerHTML = "<b>DNFs' Causes</b><br>";
         svgDNFDiv.onmouseover = function() {
@@ -1128,11 +1137,28 @@
                 .attr("transform", "translate(" + (margins.left) + "," + margins.top + ")")
                 .attr("id", "dnftimeslider");
         
-        // Initalizes an empty svg for the points bars
+        // Adds the track selector with input event
+        var svgDNFDiv2 = document.createElement('div');
+        svgDNFDiv.appendChild(svgDNFDiv2);
+        svgDNFDiv2.appendChild(document.createTextNode("Show DNFs from: "));
+        var selectTrack = document.createElement('select');
+        selectTrack.id = "select-track-dnf";
+        selectTrack.style.width = "150px";
+        var defaultTrackOption = document.createElement('option');
+        defaultTrackOption.value = 0;
+        defaultTrackOption.innerHTML = "- EVERY TRACK -";
+        selectTrack.appendChild(defaultTrackOption);
+        svgDNFDiv2.appendChild(selectTrack);
+        document.getElementById("select-track-dnf").onchange = function() { 
+            selectedTrackDNF = this.value;
+            plotDNF(data, minYearSelectedDNF, maxYearSelectedDNF, selectedTrackDNF);
+        }
+        
+        // Initalizes an empty svg for the lollipop chart
         dnfSvg = d3.select('#dnf')
             .append('svg')
                 .attr("width", small_container_dimensions.width)
-                .attr("height", small_container_dimensions.height - 20)
+                .attr("height", small_container_dimensions.height - 50)
                 //.style("background-color", "red")
             .append("g")
                 .attr("transform", "translate(" + (margins.left+20) + "," + margins.top + ")")
@@ -1147,8 +1173,10 @@
         textDiv.appendChild(labelTotalRacesDNF);
               
         // Plots the timeslider and lollipop graph that displays data about the causes of DNFs
+        minYearSelectedDNF = minYear;
+        maxYearSelectedDNF = maxYear;
         drawDNFTimeSlider(data);
-        plotDNF(data, minYear, maxYear);
+        plotDNF(data, minYearSelectedDNF, maxYearSelectedDNF, selectedTrackDNF);
     }
     
     // Draws a time slider for the DNF lollipop chart
@@ -1169,18 +1197,20 @@
                     val[1] = val[0];
                     val[0] = swap;
                 }
-                plotDNF(data, val[0], val[1]);
+                minYearSelectedDNF = val[0];
+                maxYearSelectedDNF = val[1];
+                plotDNF(data, minYearSelectedDNF, maxYearSelectedDNF, selectedTrackDNF);
             });
         dnfTimeSliderSvg.call(sliderDNF); 
     }
         
     // Plots the lollipop graph that displays data about the causes of DNFs
-    function plotDNF(data, selectedMinYear, selectedMaxYear) {
+    function plotDNF(data, selectedMinYear, selectedMaxYear, selectedTrack) {
         // Erase previous data
         dnfSvg.selectAll('*').remove();
         
         // Finds the relevant data to plot and sorts it
-        relevantData = findDNFs(data, selectedMinYear, selectedMaxYear);
+        relevantData = findDNFs(data, selectedMinYear, selectedMaxYear, selectedTrack);
         sortedRelevantData = relevantData.slice(2, relevantData.length);
         sortedRelevantData.sort(function(x, y) {
             return d3.descending(x.value, y.value);
@@ -1205,7 +1235,7 @@
             .domain(sortedRelevantData.map(function(d) {
                 return d.key;
              }))
-            .range([0, small_chart_dimensions.height])
+            .range([0, small_chart_dimensions.height-30])
             .padding(1);
         
         // Initializes the axis
@@ -1215,7 +1245,7 @@
         // Appends the x axis
         dnfSvg.append("g")
             .attr("class","xDNF_axis")
-            .attr("transform", "translate(0,"+(small_chart_dimensions.height)+")")
+            .attr("transform", "translate(0,"+(small_chart_dimensions.height-30)+")")
             .call(xAxis);
         
         // Appends the y axis
@@ -1322,14 +1352,14 @@
         svgConsDiv.appendChild(svgConsDiv2);
         svgConsDiv2.appendChild(document.createTextNode("Show placements from: "));
         var selectTrack = document.createElement('select');
-        selectTrack.id = "select-track";
+        selectTrack.id = "select-track-cons";
         selectTrack.style.width = "150px";
         var defaultTrackOption = document.createElement('option');
         defaultTrackOption.value = 0;
         defaultTrackOption.innerHTML = "- EVERY TRACK -";
         selectTrack.appendChild(defaultTrackOption);
         svgConsDiv2.appendChild(selectTrack);
-        document.getElementById("select-track").onchange = function() { 
+        document.getElementById("select-track-cons").onchange = function() { 
             selectedTrackCons = this.value;
             plotConsistency(data, minYearSelectedCons, maxYearSelectedCons, selectedTrackCons);
         }
@@ -1394,7 +1424,9 @@
         
         // Adds data about circuits if not already done
         if (flagAddCircuits == 0) {
-            var selection = document.getElementById("select-track");
+            var selection = document.getElementById("select-track-cons");
+            addCircuitsToSelection(selection);
+            selection = document.getElementById("select-track-dnf");
             addCircuitsToSelection(selection);
             flagAddCircuits = 1;
         }
@@ -1567,7 +1599,7 @@
             about.innerHTML = "This lollipop chart shows the causes of DNFs. 'Physical' includes cases of external damage to the car (tyre punctures, broken wings etc.), while 'Mechanical' includes damage to the internal components."; 
         }
         else if (index == 4) {
-            about.innerHTML = "This box-plot chart shows the distribution of the placements upon finishes. A quartile of the distribution (outliers excluded) falls in each of the four sections, meaning that the gray box represents ~50% of the placements.";
+            about.innerHTML = "This box-plot chart shows the distribution of the placements upon finishes. A quartile of the distribution falls in each of the four sections, meaning that the gray box represents ~50% of the placements.";
         }
         else {
             about.innerHTML = index;
@@ -1728,7 +1760,7 @@
     }
     
     // Finds the reasons of DNFs for the selected driver
-    function findDNFs(data, minYear, maxYear) {
+    function findDNFs(data, minYear, maxYear, index) {  
         // Groups all the results by driver
         groupedResults = d3.nest()
             .key(function(d) {
@@ -1743,6 +1775,12 @@
             if (driverKey == selectedDriver) {
                 driverResults = groupedResults[i].values;
                 for (j = 0; j < driverResults.length; j++) {
+                    if (index != 0) {
+                        currentTrack = circuits[index-1];
+                        if (currentTrack != driverResults[j].circuit) {
+                            continue;
+                        }
+                    }
                     tuple = {
                             year: driverResults[j].year,
                             round: driverResults[j].round,
