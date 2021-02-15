@@ -1451,104 +1451,140 @@
             .style("text-anchor","end")
             .text("Placements");
         
-        // Finds the right values for the boxplot
+        // Sorts the data
         sortedRelevantResults = relevantData.sort(function(x, y) {
             return d3.ascending(x, y);
         });
-        var q1 = d3.quantile(sortedRelevantResults, .25).toFixed(0);
-        var median = d3.quantile(sortedRelevantResults, .5).toFixed(0);
-        var q3 = d3.quantile(sortedRelevantResults, .75).toFixed(0);
-        var interQuantileRange = q3 - q1;
-    
-        var min = sortedRelevantResults[0];
-        var max = sortedRelevantResults[sortedRelevantResults.length-1];
-       
-        /* WITHOUT OUTLIERS
-        var min = Math.round(q1 - 1.5 * interQuantileRange);
-        if (min < sortedRelevantResults[0]) {
-            min = sortedRelevantResults[0];
-        }
-        var max = Math.round(q1 + 1.5 * interQuantileRange); */
-        
         var boxHeight = 25;
         var yCenter = 50;
         
-        /* DEBUG
-        console.log(sortedRelevantResults);
-        console.log("q1: " + q1 +", median: " + median +", q3: " + q3 + ", Interquantile Range: " + interQuantileRange);
-        console.log("Min: " + min + ", Max: " + max); */
+        // Draws the boxplot if there is enough data
+        if (sortedRelevantResults.length >= 4) {
+            // Finds the right values for the boxplot
+            var q1 = d3.quantile(sortedRelevantResults, .25).toFixed(0);
+            var median = d3.quantile(sortedRelevantResults, .5).toFixed(0);
+            var q3 = d3.quantile(sortedRelevantResults, .75).toFixed(0);
+            var interQuantileRange = q3 - q1;
+    
+            var min = sortedRelevantResults[0];
+            var max = sortedRelevantResults[sortedRelevantResults.length-1];
+       
+            /* WITHOUT OUTLIERS
+            var min = Math.round(q1 - 1.5 * interQuantileRange);
+            if (min < sortedRelevantResults[0]) {
+                min = sortedRelevantResults[0];
+            }
+            var max = Math.round(q1 + 1.5 * interQuantileRange); */
+        
+            /* DEBUG
+            console.log(sortedRelevantResults);
+            console.log("q1: " + q1 +", median: " + median +", q3: " + q3 + ", Interquantile Range: " + interQuantileRange);
+            console.log("Min: " + min + ", Max: " + max); */
 
-        // Draws the main horizontal line
-        consSvg.append("line")
-            .attr("x1", xCons(min))
-            .attr("x2", xCons(min))
-            .attr("y1", yCenter)
-            .attr("y2", yCenter)
-            .attr("stroke", "black")
-            .style("opacity", 0)
-            .transition()
-                .duration(2000)
-                .attr("x2", xCons(max))
-                .style("opacity", 1);
-
-        // Draws the box
-        consSvg.append("rect")
-            .attr("x", xCons(q1))
-            .attr("y", yCenter - boxHeight/2)
-            .attr("height", boxHeight)
-            .attr("width", (xCons(q3)-xCons(q1)))
-            .style("stroke", "black")
-            .style("fill", "#69b3a2")
-            .style("opacity", 0)
-            .on("mouseover", function(d) {
-                d3.select(this).style("stroke-width", 3);
-                d3.select(".boxplot_line").style("stroke-width", 3);
-                var coords = d3.mouse(this);
-                var text = "";
-                if (q1 == min && q3 == max) {
-                    text = "100% of Placements: [" + q1 + ", " + q3 + "] ";
-                }
-                else if (q1 == min || q3 == max) {
-                    text = "75% of Placements: [" + q1 + ", " + q3 + "] ";
-                }
-                else {
-                    text = "50% of Placements: [" + q1 + ", " + q3 + "] ";
-                }
-                drawOnMouseOverLabel(coords, consSvg, text, "black", q1, 1, 22);
-            })
-            .on("mouseout", function(d) {
-                d3.select(this).style("stroke-width", 1);
-                d3.select(".boxplot_line").style("stroke-width", 1);
-                d3.select(".rect_label").remove();
-            })
-            .transition()
-                .duration(2000)
-                .delay(1500)
-                .style("opacity", 1);
-
-        // Draws median, min and max vertical lines
-        consSvg.selectAll("lines")
-            .data([median, min, max])
-            .enter()
-            .append("line")
-                .attr("class", "boxplot_line")
-                .attr("x1", function(d) {
-                    return xCons(d);
-                })
-                .attr("x2", function(d) {
-                    return xCons(d);
-                })
-                .attr("y1", yCenter + boxHeight/2)
-                .attr("y2", yCenter - boxHeight/2)
+            // Draws the main horizontal line
+            consSvg.append("line")
+                .attr("x1", xCons(min))
+                .attr("x2", xCons(min))
+                .attr("y1", yCenter)
+                .attr("y2", yCenter)
                 .attr("stroke", "black")
                 .style("opacity", 0)
                 .transition()
                     .duration(2000)
+                    .attr("x2", xCons(max))
+                    .style("opacity", 1);
+
+            // Draws the box
+            consSvg.append("rect")
+                .attr("x", xCons(q1))
+                .attr("y", yCenter - boxHeight/2)
+                .attr("height", boxHeight)
+                .attr("width", (xCons(q3)-xCons(q1)))
+                .style("stroke", "black")
+                .style("fill", "#69b3a2")
+                .style("opacity", 0)
+                .on("mouseover", function(d) {
+                    d3.select(this).style("stroke-width", 3);
+                    d3.select(".boxplot_line").style("stroke-width", 3);
+                    var coords = d3.mouse(this);
+                    var text = "";
+                    if (q1 == min && q3 == max) {
+                        text = "100% of Placements: [" + q1 + ", " + q3 + "] ";
+                    }
+                    else if (q1 == min || q3 == max) {
+                        text = "75% of Placements: [" + q1 + ", " + q3 + "] ";
+                    }
+                    else {
+                        text = "50% of Placements: [" + q1 + ", " + q3 + "] ";
+                    }
+                    drawOnMouseOverLabel(coords, consSvg, text, "black", q1, 1, 22);
+                })
+                .on("mouseout", function(d) {
+                    d3.select(this).style("stroke-width", 1);
+                    d3.select(".boxplot_line").style("stroke-width", 1);
+                    d3.select(".rect_label").remove();
+                })
+                .transition()
+                    .duration(2000)
                     .delay(1500)
                     .style("opacity", 1);
-                
+
+            // Draws median, min and max vertical lines
+            consSvg.selectAll("lines")
+                .data([median, min, max])
+                .enter()
+                .append("line")
+                    .attr("class", "boxplot_line")
+                    .attr("x1", function(d) {
+                        return xCons(d);
+                    })
+                    .attr("x2", function(d) {
+                        return xCons(d);
+                    })
+                    .attr("y1", yCenter + boxHeight/2)
+                    .attr("y2", yCenter - boxHeight/2)
+                    .attr("stroke", "black")
+                    .style("opacity", 0)
+                    .transition()
+                        .duration(2000)
+                        .delay(1500)
+                        .style("opacity", 1);
+        }
+        
+        // Draws just a bunch of points
+        else {
+            consSvg.selectAll("mycircle")
+                .data(sortedRelevantResults)
+                .enter()
+                .append("circle")
+                    .attr("cx", function(d) { 
+                        return xCons(d); 
+                    })
+                    .attr("cy", yCenter + boxHeight/2)
+                    .attr("r", "4")
+                    .style("fill", "#69b3a2")
+                    .style("opacity", 0)
+                    .style("stroke", "black")
+                    .on("mouseover", function(d) {
+                        d3.select(this).attr("r", "6");
+                        var coords = d3.mouse(this);
+                        var text = "[P: " + d + "] ";
+                        drawOnMouseOverLabel(coords, consSvg, text, "black", d, 1, 22);
+                    })
+                    .on("mouseout", function(d) {
+                        d3.select(this).attr("r", "4");
+                        d3.select(".rect_label").remove();
+                    })   
+                    .transition()
+                        .duration(2000)
+                        .style("opacity", 1);
+        }
+            
         // Refreshes the counter
-        labelTotalRacesCons.innerHTML = "Number of finishes: " + relevantData.length + "<br><br>";
+        labelTotalRacesCons.innerHTML = "Number of finishes: " + relevantData.length + "<br>";
+        if (sortedRelevantResults.length < 4) {
+            labelTotalRacesCons.innerHTML += "Not enough data to draw a box-plot!";
+        }
     }
     
     // Adds the list of tracks to a selection
