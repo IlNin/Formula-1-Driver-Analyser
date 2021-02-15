@@ -1455,9 +1455,9 @@
         sortedRelevantResults = relevantData.sort(function(x, y) {
             return d3.ascending(x, y);
         });
-        var q1 = d3.quantile(sortedRelevantResults, .25);
-        var median = d3.quantile(sortedRelevantResults, .5);
-        var q3 = d3.quantile(sortedRelevantResults, .75);
+        var q1 = d3.quantile(sortedRelevantResults, .25).toFixed(0);
+        var median = d3.quantile(sortedRelevantResults, .5).toFixed(0);
+        var q3 = d3.quantile(sortedRelevantResults, .75).toFixed(0);
         var interQuantileRange = q3 - q1;
     
         var min = sortedRelevantResults[0];
@@ -1497,19 +1497,41 @@
             .attr("y", yCenter - boxHeight/2)
             .attr("height", boxHeight)
             .attr("width", (xCons(q3)-xCons(q1)))
-            .attr("stroke", "black")
+            .style("stroke", "black")
             .style("fill", "#69b3a2")
             .style("opacity", 0)
+            .on("mouseover", function(d) {
+                d3.select(this).style("stroke-width", 3);
+                d3.select(".boxplot_line").style("stroke-width", 3);
+                var coords = d3.mouse(this);
+                var text = "";
+                if (q1 == min && q3 == max) {
+                    text = "100% of Placements: [" + q1 + ", " + q3 + "] ";
+                }
+                else if (q1 == min || q3 == max) {
+                    text = "75% of Placements: [" + q1 + ", " + q3 + "] ";
+                }
+                else {
+                    text = "50% of Placements: [" + q1 + ", " + q3 + "] ";
+                }
+                drawOnMouseOverLabel(coords, consSvg, text, "black", q1, 1, 22);
+            })
+            .on("mouseout", function(d) {
+                d3.select(this).style("stroke-width", 1);
+                d3.select(".boxplot_line").style("stroke-width", 1);
+                d3.select(".rect_label").remove();
+            })
             .transition()
                 .duration(2000)
                 .delay(1500)
                 .style("opacity", 1);
 
         // Draws median, min and max vertical lines
-        consSvg.selectAll("toto")
-            .data([min, median, max])
+        consSvg.selectAll("lines")
+            .data([median, min, max])
             .enter()
             .append("line")
+                .attr("class", "boxplot_line")
                 .attr("x1", function(d) {
                     return xCons(d);
                 })
@@ -1915,8 +1937,7 @@
         
         return relevantResults;   
     }
-        
-    
+          
     drawTitle();
     </script>
     </body>
