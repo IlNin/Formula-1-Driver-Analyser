@@ -17,7 +17,7 @@
         width: container_dimensions.width - margins.left - margins.right,
         height: container_dimensions.height - margins.top - margins.bottom
     };
-    var small_container_dimensions = {width: 450, height: 220};
+    var small_container_dimensions = {width: 445, height: 220};
     var small_chart_dimensions = {
         width: small_container_dimensions.width - margins.left - (margins.right + 30),
         height: small_container_dimensions.height - margins.top - margins.bottom
@@ -309,6 +309,7 @@
         // Prepares all the layouts in the bottom wrapper
         prepareDNF(data);
         prepareConsistency(data);
+        prepareSimilarDrivers(data);
         
         // Appends the yellow ending div
         var endingDiv = document.createElement('div');
@@ -1569,7 +1570,7 @@
                         d3.select(this).attr("r", "6");
                         var coords = d3.mouse(this);
                         var text = "[P: " + d + "] ";
-                        drawOnMouseOverLabel(coords, consSvg, text, "black", d, 1, 22);
+                        drawOnMouseOverLabel(coords, consSvg, text, "black", 0, 0, 0);
                     })
                     .on("mouseout", function(d) {
                         d3.select(this).attr("r", "4");
@@ -1585,6 +1586,28 @@
         if (sortedRelevantResults.length < 4) {
             labelTotalRacesCons.innerHTML += "Not enough data to draw a box-plot!";
         }
+    }
+    
+    // Prepares the layout for the chart that displays similar drivers to the one selected
+    function prepareSimilarDrivers(data) {
+        // Initializes the div that contains the svg area for the points bars    
+        svgSimDiv = document.createElement('div');
+        svgSimDiv.id = "similar-drivers";
+        svgSimDiv.innerHTML = "<b>Drivers With Similar Achievements</b><br>";
+        svgSimDiv.onmouseover = function() {
+            writeOnAbout(5);
+        }
+        bottomWrapper.append(svgSimDiv); 
+        
+        // Initalizes an empty svg for the points bars
+        simSvg = d3.select('#similar-drivers')
+            .append('svg')
+                .attr("width", small_container_dimensions.width)
+                .attr("height", small_container_dimensions.height)
+                //.style("background-color", "red")
+            .append("g")
+                .attr("transform", "translate(" + margins.left + "," + margins.top + ")")
+                .attr("id", "similar-drivers");
     }
     
     // Adds the list of tracks to a selection
