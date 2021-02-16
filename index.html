@@ -12,12 +12,12 @@
     <script charset="utf-8">  
     // Dimensions
     var margins = {top: 20, right: 10, bottom: 40, left: 45};
-    var container_dimensions = {width: 550, height: 250}; 
+    var container_dimensions = {width: 550, height: 240}; 
     var chart_dimensions = {
         width: container_dimensions.width - margins.left - margins.right,
         height: container_dimensions.height - margins.top - margins.bottom
     };
-    var small_container_dimensions = {width: 445, height: 220};
+    var small_container_dimensions = {width: 445, height: 210};
     var small_chart_dimensions = {
         width: small_container_dimensions.width - margins.left - (margins.right + 30),
         height: small_container_dimensions.height - margins.top - margins.bottom
@@ -49,6 +49,7 @@
     // Drivers data
     var activeDrivers = []; // List of drivers loaded by the data that are active
     var retiredDrivers = []; // List of drivers loaded by the data that are retired
+    var achievements = []; // List of tuples that contain the achievements for each driver
     var circuits = []; // List of tracks where the selected driver has driven
     var flagAddCircuits = 0;
     var selectedDriver = "";
@@ -140,7 +141,7 @@
             .defer(d3.csv, "results.csv")
             .defer(d3.csv, "qualifying.csv")
             .defer(d3.csv, "driverStandings.csv")
-            .await(function(error, data, data2) {
+            .await(function(error, data, data2, data3) {
                 // Prints the error in case something goes wrong
                 if (error) {
                     console.log(error);
@@ -171,6 +172,11 @@
                         d.name = d.name.replace(/[\s.']/g, '_'); // Removes eventual spaces in the names
                     });
                     
+                    data3.forEach(function(d) { 
+                        d.surname = d.surname.replace(/[\s.']/g, '_'); 
+                        d.name = d.name.replace(/[\s.']/g, '_'); 
+                    });
+                    
                     // Sort all drivers in alphabetical order
                     activeDrivers.sort(function(a, b) {
                         if (a < b) { 
@@ -190,11 +196,70 @@
                         }
                         return 0;
                     });
-                
+                    
+                    extractDriverAchievements(activeDrivers, data, data2, data3); // Extracts the most important achievements from all drivers
+                    extractDriverAchievements(retiredDrivers, data, data2, data3);
                     addDriversToTitle(); // Adds the events to the user's selections in the title now that the data is loaded
                     enableInputsToTitle(data, data2);
                 }
             });
+    }
+    
+    // Extract the most important achievements from all drivers
+    function extractDriverAchievements(drivers, data, data2, data3) {
+        for (i = 0; i < drivers.length; i++) {
+            var driver = drivers[i];
+            var championships = 0;
+            var years = []; // Years where the championship was won
+            var points = 0;
+            var wins = 0;
+            var poles = 0;
+            
+            data.forEach(function(d) {
+                if (driver == d.surname + "_" + d.name) {
+                    points += parseInt(d.points);
+                    if (d.position == 1) {
+                        wins += 1;
+                    }
+                }
+            });
+            
+            data2.forEach(function(d) {
+                if (driver == d.surname + "_" + d.name && d.position == 1) {
+                    poles += 1;
+                }
+            });
+            
+            var last_championship_position = 0;
+            var last_year = 0;
+            data3.forEach(function(d) { 
+                if (d.year != last_year && last_championship_position == 1) {
+                        championships += 1;
+                        years.push(last_year);
+                        last_year = 0;
+                        last_championship_position = 0;
+                }
+                if (driver == d.surname + "_" + d.name) {
+                    last_year = d.year;
+                    last_championship_position = d.position;
+                }
+            });
+            
+            if (driver == "Hamilton_Lewis") {
+                championships += 1;
+                years.push("2020");
+            }
+       
+            var newTuple = {
+                driver: driver,
+                championships: championships,
+                years: years,
+                points: points,
+                wins: wins,
+                poles: poles
+            }
+            achievements.push(newTuple);
+        }
     }
     
     // Adds the correct list of drivers to the selection
@@ -284,10 +349,32 @@
         minYearSelectedCons = 0;
         maxYearSelectedCons = 0;
         
-        // Appends the div with the name of the driver selected
+        // Appends the div with the name and stats of the driver selected
+        var points;
+        var wins;
+        var poles;
+        var championships;
+        var years;
+        for (i = 0; i < achievements.length; i++) {
+            if (achievements[i].driver == selectedDriver) {
+                points = achievements[i].points;
+                wins = achievements[i].wins;
+                poles = achievements[i].poles;
+                championships = achievements[i].championships;
+                years = achievements[i].years;
+            }
+        }       
         var driverSelectedDiv = document.createElement('div');
         driverSelectedDiv.id = "selecteddriver";
-        driverSelectedDiv.innerHTML = "<b>- " + selectedDriver.replace(/_/g, ' ') + " -</b";
+        driverSelectedDiv.innerHTML = "<b>- " + selectedDriver.replace(/_/g, ' ') + " -</b><br>";
+        driverSelectedDiv.innerHTML += "<i>Points: </i>" + points + " - <i>Wins: </i>" + wins + " - <i>Poles: </i>" + poles + " - <i>Championships: </i>" + championships;
+        if (years.length > 0) {
+            driverSelectedDiv.innerHTML += " [";
+            for (i = 0; i < years.length-1; i++) {
+                driverSelectedDiv.innerHTML += years[i] + ", ";
+            }
+            driverSelectedDiv.innerHTML += years[years.length-1] + "]";
+        }
         document.body.appendChild(driverSelectedDiv);
         
         // Initializes the middle wrapper

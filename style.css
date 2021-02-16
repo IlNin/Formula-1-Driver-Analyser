@@ -114,6 +114,12 @@
     text-align: center;
     border-left: 3px solid black;
 }
+#similar-drivers {
+    padding-top: 6px;
+    display: inline-block;
+    text-align: center;
+    border-left: 3px solid black;
+}
 #endingdiv {
     background: yellow;
     text-align: center;
