@@ -430,7 +430,7 @@
         // Prepares all the layouts in the bottom wrapper
         prepareDNF(data);
         prepareConsistency(data);
-        prepareSimilarDrivers(data);
+        prepareSimilarDrivers();
         
         // Appends the yellow ending div
         var endingDiv = document.createElement('div');
@@ -1710,7 +1710,7 @@
     }
     
     // Prepares the layout for the chart that displays similar drivers to the one selected
-    function prepareSimilarDrivers(data) {
+    function prepareSimilarDrivers() {
         // Initializes the div that contains the svg area for the points bars    
         svgSimDiv = document.createElement('div');
         svgSimDiv.id = "similar-drivers";
@@ -1724,13 +1724,151 @@
         simSvg = d3.select('#similar-drivers')
             .append('svg')
                 .attr("width", small_container_dimensions.width)
-                .attr("height", small_container_dimensions.height)
+                .attr("height", small_container_dimensions.height+30)
                 //.style("background-color", "red")
             .append("g")
                 .attr("transform", "translate(" + margins.left + "," + margins.top + ")")
                 .attr("id", "similar-drivers");
+       
+        plotSimilarDrivers();
     }
     
+    // Plots the layout that displays similar drivers to the one selected
+    function plotSimilarDrivers() {
+        // Erase previous data
+        simSvg.selectAll('*').remove();
+        
+        // Gets PCA values of the selected driver
+        relevantData = [];
+        pca1 = 0;
+        pca2 = 0;
+        for (i = 0; i < PCAdata.length; i++) {
+            if (PCAdata[i].driver == selectedDriver) {
+                pca1 = PCAdata[i].pca1;
+                pca2 = PCAdata[i].pca2;
+                relevantData.push(PCAdata[i]);
+            }
+        }   
+        
+        // Finds the top 5 most similar drivers
+        chosenIndexes = [];
+        var counter = 0;
+        var maxCloseness = 30;
+        var index = 0;
+        var maxPCA1 = 0;
+        var maxPCA2 = 0;
+        while (counter < 5) {
+            for (i = 0; i < PCAdata.length; i++) {
+                if (PCAdata[i].driver != selectedDriver && counter < 5) {
+                    var a = pca1 - PCAdata[i].pca1;
+                    var b = pca2 - PCAdata[i].pca2;
+                    var closeness = Math.sqrt(a*a + b*b);
+                    if (closeness < maxCloseness && !chosenIndexes.includes(i)) {
+                        maxCloseness = closeness;
+                        index = i;
+                    }
+                }
+            }
+            if (!chosenIndexes.includes(index)) {
+                relevantData.push(PCAdata[index]);
+                chosenIndexes.push(index);
+                if (Math.abs(PCAdata[index].pca1) > maxPCA1) {
+                    maxPCA1 = Math.abs(PCAdata[index].pca1);
+                }
+                if (Math.abs(PCAdata[index].pca2) > maxPCA2) {
+                    maxPCA2 = Math.abs(PCAdata[index].pca2);
+                }
+            }
+           
+            counter += 1;
+            maxCloseness = 30;
+            index = 0;
+        }
+        
+        if (maxPCA1 < maxPCA2) {
+            maxPCA1 = maxPCA2
+        } 
+        
+        console.log(relevantData);
+
+        // Initializes the PCA1 scale
+        pca1Scale = d3.scaleLinear()
+            .domain([-maxPCA1, maxPCA1])
+            .range([0, small_container_dimensions.height]);
+        
+        // Initializes the PCA2 scale
+        pca2Scale = d3.scaleLinear()
+            .domain([maxPCA1, -maxPCA1])
+            .range([0, small_container_dimensions.height]);
+        
+        // Initializes the colors
+        simColors = d3.scaleOrdinal(d3.schemeCategory10);
+            
+        // Initializes the axis
+        pca1Axis = d3.axisBottom(pca1Scale).ticks(0);
+        pca2Axis = d3.axisLeft(pca2Scale).ticks(0);
+        
+        // Appends the PCA1 axis
+        simSvg.append("g")
+            .attr("class","pca1_axis")
+            .attr("transform", "translate("+(60)+","+(small_chart_dimensions.height-45)+")")
+            .call(pca1Axis);
+        simSvg.append("text")
+            .attr("class","label")
+            .attr("x", small_chart_dimensions.height+120)
+            .attr("y", small_chart_dimensions.height-30)
+            .style("text-anchor","end")
+            .style("font", "12px times")
+            .text("PC1");
+        
+        // Appends the PCA2 axis
+        simSvg.append("g")
+            .attr("transform", "translate("+(165)+",0)")
+            .attr("class","pca2_axis")
+            .call(pca2Axis);
+        simSvg.append("text")
+            .attr("class","label")
+            .attr("transform", "translate("+(185)+",0)" + "rotate(-90)")
+            .attr("y", 6)
+            .attr("dy","-2.5em")
+            .style("text-anchor","end")
+            .style("font", "12px times")
+            .text("PC2");
+            
+       
+        // Plot the circles
+        circles = simSvg.selectAll("mycircle")
+            .data(relevantData)
+            .enter()
+            .append("circle")
+                .attr("class", function(d) {
+                    return d.driver;
+                })
+                .attr("cx", function(d) { 
+                    return pca1Scale(d.pca1)+60; 
+                })
+                .attr("cy", function(d) { 
+                    return pca2Scale(d.pca2); 
+                })
+                .attr("r", 6)
+                .style("fill", function(d) {
+                    return simColors(d.driver);
+                })
+                .style("stroke", "black");
+        
+        circles.on("mouseover", function(d) {
+            d3.select(this).attr("r", 8);
+            coords = d3.mouse(this);
+            text = "[" + d.driver + "]  ";
+            drawOnMouseOverLabel(coords, simSvg, text, simColors(d.driver), 0, 0, 0);
+        });
+        
+        circles.on("mouseout", function(d) {
+            d3.select(this).attr("r", 6);
+            d3.select(".rect_label").remove();
+        });
+    }
+        
     // Adds the list of tracks to a selection
     function addCircuitsToSelection(selection) {
         // Reorder the circuits
