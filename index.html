@@ -5,7 +5,7 @@
         <title>Formula 1 Driver Analyser</title>
         <script type="text/javascript" src="d3.js" charset="utf-8"></script>
         <script src="https://unpkg.com/d3-simple-slider"></script>
-        <script type="text/javascript" src="http://code.jquery.com/jquery-2.1.4.min.js"></script>  
+        <script type="text/javascript" src="https://code.jquery.com/jquery-2.1.4.min.js"></script>  
         <script src="https://cdn.socket.io/socket.io-1.0.0.js"></script>
         <link rel="stylesheet" type="text/css" href="style.css"/>
 	</head>
@@ -430,7 +430,7 @@
         // Prepares all the layouts in the bottom wrapper
         prepareDNF(data);
         prepareConsistency(data);
-        prepareSimilarDrivers();
+        prepareSimilarDrivers(data, data2);
         
         // Appends the yellow ending div
         var endingDiv = document.createElement('div');
@@ -1710,7 +1710,7 @@
     }
     
     // Prepares the layout for the chart that displays similar drivers to the one selected
-    function prepareSimilarDrivers() {
+    function prepareSimilarDrivers(data, data2) {
         // Initializes the div that contains the svg area for the points bars    
         svgSimDiv = document.createElement('div');
         svgSimDiv.id = "similar-drivers";
@@ -1730,11 +1730,11 @@
                 .attr("transform", "translate(" + margins.left + "," + margins.top + ")")
                 .attr("id", "similar-drivers");
        
-        plotSimilarDrivers();
+        plotSimilarDrivers(data, data2);
     }
     
     // Plots the layout that displays similar drivers to the one selected
-    function plotSimilarDrivers() {
+    function plotSimilarDrivers(data, data2) {
         // Erase previous data
         simSvg.selectAll('*').remove();
         
@@ -1867,6 +1867,14 @@
             d3.select(this).attr("r", 6);
             d3.select(".rect_label").remove();
         });
+        
+        circles.on("click", function(d) {
+            if (activeDrivers.includes(d.driver) || retiredDrivers.includes(d.driver)) {
+                selectedDriver = d.driver;
+                initializeChartsLayout(data, data2);
+            }
+        });
+            
     }
         
     // Adds the list of tracks to a selection
