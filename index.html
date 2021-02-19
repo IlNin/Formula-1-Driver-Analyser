@@ -5,6 +5,8 @@
         <title>Formula 1 Driver Analyser</title>
         <script type="text/javascript" src="d3.js" charset="utf-8"></script>
         <script src="https://unpkg.com/d3-simple-slider"></script>
+        <script type="text/javascript" src="http://code.jquery.com/jquery-2.1.4.min.js"></script>  
+        <script src="https://cdn.socket.io/socket.io-1.0.0.js"></script>
         <link rel="stylesheet" type="text/css" href="style.css"/>
 	</head>
     
@@ -50,6 +52,7 @@
     var activeDrivers = []; // List of drivers loaded by the data that are active
     var retiredDrivers = []; // List of drivers loaded by the data that are retired
     var achievements = []; // List of tuples that contain the achievements for each driver
+    var PCAdata = []; // List of the PCA components for each driver
     var circuits = []; // List of tracks where the selected driver has driven
     var flagAddCircuits = 0;
     var selectedDriver = "";
@@ -199,6 +202,7 @@
                     
                     extractDriverAchievements(activeDrivers, data, data2, data3); // Extracts the most important achievements from all drivers
                     extractDriverAchievements(retiredDrivers, data, data2, data3);
+                    executePCA();             
                     addDriversToTitle(); // Adds the events to the user's selections in the title now that the data is loaded
                     enableInputsToTitle(data, data2);
                 }
@@ -259,9 +263,39 @@
                 poles: poles
             }
             achievements.push(newTuple);
-        }
+        }     
     }
     
+    // Communicates with a Python script that executes a PCA on the achievements of the drivers
+    function executePCA() {
+        $.ajax({
+            /*headers: {
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin':'*'
+            }, */
+            type: 'POST',
+            url: "http://127.0.0.1:5000/pca",
+            data: JSON.stringify({value: achievements}),
+            crossDomain: true,
+            success: function (response) {
+                for (i = 0; i < response.length; i++) {
+                    var tuple = {
+                        driver: achievements[i].driver,
+                        pca1: response[i][0],
+                        pca2: response[i][1]
+                    }
+                    PCAdata.push(tuple);
+                }
+            },
+            error: function (xhr, status) {
+                alert("error");
+            },         
+        });
+        
+        /*DEBUG
+        console.log(PCAdata); */
+    }
+ 
     // Adds the correct list of drivers to the selection
     function addDriversToTitle() {
         if (showActiveDrivers) {
