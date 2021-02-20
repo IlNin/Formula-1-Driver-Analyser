@@ -35,7 +35,7 @@
 #about {
     border: 3px solid black;
     width: 435px;
-    font-size: 14px;
+    font-size: 13px;
     border-left: none;
     padding-left: 5px;
     padding-right: 5px;
@@ -119,6 +119,11 @@
     display: inline-block;
     text-align: center;
     border-left: 3px solid black;
+}
+#simlegendtable {
+    padding-top: 6px;
+    display: inline-block;
+    text-align: center;
 }
 #endingdiv {
     background: yellow;

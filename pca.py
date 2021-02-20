@@ -43,6 +43,23 @@ def pca():
         dpca = pca.fit_transform(d_std)     
         print(dpca)
         
+        # Plots the data
+        showData = 0
+        if (showData):
+            plt.plot(
+                dpca[:,0], 
+                dpca[:,0],
+                'o',
+                markersize = 7,
+                color = 'green',
+                alpha = 0.5,
+                label = "PCA"
+            )
+            plt.xlabel("Y1")
+            plt.ylabel("Y2")
+            plt.legend()
+            plt.show()
+           
         # Sends the new data back
         response = jsonify(dpca.tolist())
         response.headers.add('Access-Control-Allow-Origin', '*')
