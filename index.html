@@ -65,6 +65,9 @@
     var nBarsClicked = 0;
     var cumulativePoints = 0;
     
+    // DEBUG
+    var showTitleImage = 1;
+    
     // Draws the title screen above the charts
     function drawTitle() {
         // Creates the wrapper div that contains the div 'title'
@@ -78,7 +81,16 @@
         // Creates the div 'title' which contains text, selections and buttons
         var title = document.createElement('div');
         title.id = "title";
-        title.innerHTML = "<h2>Formula 1 Driver Analyser</h2>";
+        if (showTitleImage) {
+            var image = document.createElement("img");
+            image.setAttribute("src", "Logo3.png");
+            image.setAttribute("height", "70px");
+            image.setAttribute("width", "445px");
+            title.appendChild(image);
+        }
+        else {
+            title.innerHTML = "<h2>Formula 1 Driver Analyser</h2>";
+        }
         aboveWrapper.appendChild(title);   
         
         // Creates the div 'menu' which allows the user to select a driver
@@ -1710,9 +1722,12 @@
         }
             
         // Refreshes the counter
-        labelTotalRacesCons.innerHTML = "Number of finishes: " + relevantData.length + "<br>";
-        if (sortedRelevantResults.length < 4) {
-            labelTotalRacesCons.innerHTML += "Not enough data to draw a box-plot!";
+        if (sortedRelevantResults.length >= 4) {
+            labelTotalRacesCons.innerHTML = "<br>Number of finishes: " + relevantData.length + "<br>";
+        }
+        else {
+            labelTotalRacesCons.innerHTML = "Not enough data to draw a box-plot!<br>";
+            labelTotalRacesCons.innerHTML += "Number of finishes: " + relevantData.length + "<br>";
         }
     }
     
@@ -1721,7 +1736,7 @@
         // Initializes the div that contains the svg area for the points bars    
         svgSimDiv = document.createElement('div');
         svgSimDiv.id = "similar-drivers";
-        svgSimDiv.innerHTML = "<b>Drivers With Similar Achievements</b><br>";
+        svgSimDiv.innerHTML = "<b>Top 5 Drivers With Similar Achievements</b><br>";
         svgSimDiv.onmouseover = function() {
             writeOnAbout(5);
         }
@@ -1825,7 +1840,10 @@
             index = 0;
         }
         
-        if (maxPCA1 < maxPCA2) {
+        if (selectedDriver == "Hamilton_Lewis") {
+            maxPCA1 = relevantData[0].pca1;
+        }
+        else if (maxPCA1 < maxPCA2) {
             maxPCA1 = maxPCA2
         } 
 
