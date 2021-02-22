@@ -1353,7 +1353,7 @@
         
         // Finds the relevant data to plot and sorts it
         relevantDataDNF = findDNFs(data, selectedMinYear, selectedMaxYear, selectedTrack);
-        sortedRelevantDataDNF = relevantDataDNF.slice(2, relevantData.length);
+        sortedRelevantDataDNF = relevantDataDNF.slice(2, relevantDataDNF.length);
         sortedRelevantDataDNF.sort(function(x, y) {
             return d3.descending(x.value, y.value);
         });
