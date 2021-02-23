@@ -8,7 +8,6 @@ from sklearn import preprocessing
 from matplotlib import pyplot as plt
 
 app = Flask(__name__)
-#app.config['SECRET_KEY'] = 'the quick brown fox jumps over the lazy   dog'
 #app.config['CORS_HEADERS'] = 'Access-Control-Allow-Origin'
 
 CORS(app)
@@ -31,17 +30,23 @@ def pca():
         # Prepares the data for the PCA process
         dataForPCA = []
         for element in data['value']:
-            dataForPCA.append([element['championships'], element['points'], element['poles'], element['wins']])
+            championships = element['championships']
+            points = element['points']
+            poles = element['poles']
+            wins = element['wins']
+            dataForPCA.append([championships, points, poles, wins])
+        print("Tuples for the PCA created!")
         
         # Transforms the data
         d_std = preprocessing.StandardScaler().fit_transform(dataForPCA)
+        print("Tuples pre-processed!")
         
         # Chooses number of PCA components
         pca = PCA(n_components=2)
 
         # Applies PCA
-        dpca = pca.fit_transform(d_std)     
-        print(dpca)
+        dpca = pca.fit_transform(d_std)    
+        print("PCA applied on the tuples!")
         
         # Plots the data
         showData = 0
@@ -63,6 +68,7 @@ def pca():
         # Sends the new data back
         response = jsonify(dpca.tolist())
         response.headers.add('Access-Control-Allow-Origin', '*')
+        print("Sending back PCA data!")
         return response
 
 if __name__ == "__main__":

@@ -30,6 +30,7 @@
     
     // Divs, elements and svgs
     var aboveWrapper, wrapper, bottomWrapper;
+    var driversTimeSliderSvg;
     var barSvg, svgLegend;
     var cmpSvg, svgCmpLegend;
     var dnfTimeSliderSvg, dnfSvg, labelTotalRacesDNF;
@@ -37,7 +38,6 @@
     var simSvg, svgSimLegend, labelAchievements;
     
     // User inputs
-    var showActiveDrivers = true; // Flag that indicates to show only active drivers
     var showTotalPoints = true; // Flag that indicates to show the total points instead of the average per race
     var showWinsInRaces = true; // Flag that indicates to show the wins in races instead of qualifying
     
@@ -50,8 +50,8 @@
     var maxYearSelectedCons = 0;
     
     // Drivers data
-    var activeDrivers = []; // List of drivers loaded by the data that are active
-    var retiredDrivers = []; // List of drivers loaded by the data that are retired
+    var allDrivers = []; // List of drivers loaded by the data
+    var drivers = []; // List of drivers for the selection, which depends on the years selected by the user
     var achievements = []; // List of tuples that contain the achievements for each driver
     var PCAdata = []; // List of the PCA components for each driver
     var circuits = []; // List of tracks where the selected driver has driven
@@ -84,7 +84,7 @@
         if (showTitleImage) {
             var image = document.createElement("img");
             image.setAttribute("src", "Logo2.png");
-            image.setAttribute("height", "70px");
+            image.setAttribute("height", "76px");
             image.setAttribute("width", "445px");
             title.appendChild(image);
         }
@@ -98,33 +98,21 @@
         menu.id = "menu";
         aboveWrapper.appendChild(menu);
         
-        // Adds radios button in order to distinguish between active and retired drivers
-        menu.innerHTML += "Choose between drivers that drove in: ";
-        var activeButton = document.createElement('input');
-        activeButton.type = 'radio';
-        activeButton.name = 'drivers';
-        activeButton.id = 'active-drivers';
-        activeButton.value = "active";
-        var label = document.createElement('label');
-        label.innerHTML = "2020";
-        menu.appendChild(activeButton);
-        menu.appendChild(label);
-        menu.innerHTML += "   ";
-        
-        var retiredButton = document.createElement('input');
-        retiredButton.type = 'radio';
-        retiredButton.name = 'drivers';
-        retiredButton.id = 'retired-drivers';
-        retiredButton.value = "retired";
-        label = document.createElement('label');
-        label.innerHTML = "1994-2019";
-        menu.appendChild(retiredButton);
-        menu.appendChild(label);
-        menu.innerHTML += "<br>";
+        // Initializes an empty svg for the time slider
+        var svgDriversTimeSliderDiv = document.createElement('div');
+        svgDriversTimeSliderDiv.id = "driverstimeslider";
+        menu.appendChild(svgDriversTimeSliderDiv);
+        driversTimeSliderSvg = d3.select('#driverstimeslider')
+            .append('svg')
+                .attr("width", 422)
+                .attr("height", 40)
+                //.style("background-color", "red")
+            .append("g")
+                .attr("transform", "translate(" + 10 + "," + 6 + ")")
+                .attr("class", "driverstimeslider");
         
         // Creates a selection for the drivers with a default option, and adds it to 'title'
         menu.innerHTML += "Please select a driver: ";
-
         var selectDriver = document.createElement('select');
         selectDriver.id = "select-driver";
         selectDriver.style.width = "150px";
@@ -135,19 +123,19 @@
         menu.appendChild(selectDriver);
         menu.innerHTML += " ";
         
-         // Creates the search button, makes it disabled and adds it to 'title'
+        // Creates the search button, makes it disabled and adds it to 'title'
         var searchButton = document.createElement('button');
         searchButton.id = "search";
         searchButton.innerHTML = "Search data!";
         searchButton.disabled = true;
         menu.appendChild(searchButton);
         
+        // Creates the about section and adds a short description of the project
         var about = document.createElement('div');
         about.id = "about";
         aboveWrapper.appendChild(about);
         writeOnAbout(0);
         
-        document.getElementById("active-drivers").checked = true; 
         loadData();
     }
     
@@ -164,22 +152,13 @@
                 }
                 // Everything goes ok!
                 else {
-                    // Sort all the drivers in two list: one for the recent ones, the other for the past drivers
-                    activeDrivers = []; // Will Contain all active drivers inside the csv file
-                    retiredDrivers = []; // Will contain all retired drivers inside the csv file
                     data.forEach(function(d) { // Cycles through the data
                         d.surname = d.surname.replace(/[\s.']/g, '_'); // Removes eventual spaces in the surnames
                         d.name = d.name.replace(/[\s.']/g, '_'); // Removes eventual spaces in the names
                         var driver = d.surname + "_" + d.name;
-                        if (d.year == 2020 && !activeDrivers.includes(driver)) {
-                            activeDrivers.push(driver);
-                            var index = retiredDrivers.indexOf(driver);
-                            if (index) {
-                                retiredDrivers.splice(index, 1);
-                            }
-                        }
-                        else if (d.year >= 1994 && !retiredDrivers.includes(driver) && !activeDrivers.includes(driver)) {
-                            retiredDrivers.push(driver);
+                        if (d.year >= 1994 && d.year <= 2020 && !drivers.includes(driver)) {
+                            drivers.push(driver);
+                            allDrivers.push(driver);
                         }
                     });
                     
@@ -194,7 +173,7 @@
                     });
                     
                     // Sort all drivers in alphabetical order
-                    activeDrivers.sort(function(a, b) {
+                    drivers.sort(function(a, b) {
                         a = a.toUpperCase();
                         b = b.toUpperCase();
                         if (a < b) { 
@@ -205,20 +184,8 @@
                         }
                         return 0;
                     });
-                    retiredDrivers.sort(function(a, b){
-                        a = a.toUpperCase();
-                        b = b.toUpperCase();
-                        if (a < b) { 
-                            return -1; 
-                        }
-                        if (a > b) {
-                            return 1; 
-                        }
-                        return 0;
-                    });
                     
-                    extractDriverAchievements(activeDrivers, data, data2, data3); // Extracts the most important achievements from all drivers
-                    extractDriverAchievements(retiredDrivers, data, data2, data3);
+                    extractDriverAchievements(drivers, data, data2, data3); // Extracts the most important achievements from all drivers
                     executePCA();             
                     addDriversToTitle(); // Adds the events to the user's selections in the title now that the data is loaded
                     enableInputsToTitle(data, data2);
@@ -315,46 +282,67 @@
  
     // Adds the correct list of drivers to the selection
     function addDriversToTitle() {
-        if (showActiveDrivers) {
-            for (i = 0; i < activeDrivers.length; i++) {
-                var newDriverOption = document.createElement('option'); // Makes the new season a selectable option 
-                newDriverOption.value = i+1;
-                newDriverOption.innerHTML = activeDrivers[i].replace(/_/g, ' ');
-                document.getElementById("select-driver").appendChild(newDriverOption);
-            }
-        }
-        else {
-            for (i = 0; i < retiredDrivers.length; i++) {
-                var newDriverOption = document.createElement('option'); // Makes the new season a selectable option 
-                newDriverOption.value = i+1;
-                newDriverOption.innerHTML = retiredDrivers[i].replace(/_/g, ' ');
-                document.getElementById("select-driver").appendChild(newDriverOption);
-            }
-        }
+        for (i = 0; i < drivers.length; i++) {
+            var newDriverOption = document.createElement('option'); // Makes the new season a selectable option 
+            newDriverOption.value = i+1;
+            newDriverOption.innerHTML = drivers[i].replace(/_/g, ' ');
+            document.getElementById("select-driver").appendChild(newDriverOption);
+        }   
     }
     
     // Adds events to the interactions of the user with the title screen
     function enableInputsToTitle(data, data2) {
-        document.getElementById("active-drivers").onclick = function() {
-            showActiveDrivers = true;
-            document.getElementById("search").disabled = true; // Disables the search button
-            document.getElementById("select-driver").value = 0; // Restore the driver selector to the default option
-            var options = document.getElementById("select-driver").options.length; // Removes all options inside the selector bar the default one
-            for (i = options-1; i > 0; i--) {
-                document.getElementById("select-driver").options[i] = null;
-            }
-            addDriversToTitle();
-        }
-        document.getElementById("retired-drivers").onclick = function() {
-            showActiveDrivers = false;
-            document.getElementById("search").disabled = true; // Disables the search button
-            document.getElementById("select-driver").value = 0; // Restore the driver selector to the default option
-            var options = document.getElementById("select-driver").options.length; // Removes all options inside the selector bar the default one
-            for (i = options-1; i > 0; i--) {
-                document.getElementById("select-driver").options[i] = null;
-            }
-            addDriversToTitle();
-        }
+        // Creates and adds the time slider
+        var sliderDrivers = d3.sliderBottom()
+            .min(1994)
+            .max(2020)
+            .width(400)
+            .tickFormat(d3.format('d'))
+            .ticks(5)
+            .default([1994, 2020])
+            .step(1)
+            .fill('#2196f3')
+            .on('onchange', val => {
+                if (val[0] > val[1]) {
+                    var swap = val[1];
+                    val[1] = val[0];
+                    val[0] = swap;
+                }
+                
+                // Disables search button, restores default option and deletes all the other options
+                document.getElementById("search").disabled = true;
+                document.getElementById("select-driver").value = 0;
+                var options = document.getElementById("select-driver").options.length;
+                for (i = options-1; i > 0; i--) {
+                    document.getElementById("select-driver").options[i] = null;
+                }
+                
+                // Gets the new list of drivers
+                drivers = [];
+                data.forEach(function(d) { // Cycles through the data
+                    var driver = d.surname + "_" + d.name;
+                    if (d.year >= val[0] && d.year <= val[1] && !drivers.includes(driver)) {
+                        drivers.push(driver);
+                    }
+                });
+                
+                // Sort all drivers in alphabetical order
+                drivers.sort(function(a, b) {
+                    a = a.toUpperCase();
+                    b = b.toUpperCase();
+                    if (a < b) { 
+                        return -1; 
+                    }
+                    if (a > b) { 
+                        return 1; 
+                    }
+                    return 0;
+                });
+                
+                addDriversToTitle();
+            });
+        d3.select(".driverstimeslider").call(sliderDrivers); 
+    
         document.getElementById("select-driver").onchange = function() { 
             if (document.getElementById("select-driver").value > 0) {  // A valid driver is selected: enables search button
                 document.getElementById("search").disabled = false;
@@ -365,14 +353,8 @@
         }
         search.onclick = function() { // Checks if the user clicks the search button
             var value = document.getElementById("select-driver").value;
-            if (showActiveDrivers) {
-                selectedDriver = activeDrivers[value-1];
-                initializeChartsLayout(data, data2);
-            }
-            else {
-                selectedDriver = retiredDrivers[value-1];
-                initializeChartsLayout(data, data2);
-            }
+            selectedDriver = drivers[value-1];
+            initializeChartsLayout(data, data2);
         }    
     }
     
@@ -1223,7 +1205,7 @@
         legend
             .on("mouseover", function(d) {
                 // Highlights the entry in the legend and outlines the right bars
-                if (activeDrivers.includes(d) || retiredDrivers.includes(d)) {
+                if (allDrivers.includes(d)) {
                     d3.select(".rect"+d)
                         .attr("stroke", "black");
                     d3.select(".text"+d)
@@ -1248,7 +1230,7 @@
                     .style("stroke", "white")
             })
             .on("click", function(d) {
-                if (activeDrivers.includes(d) || retiredDrivers.includes(d)) {
+                if (allDrivers.includes(d)) {
                     selectedDriver = d;
                     initializeChartsLayout(data, data2);
                 }
@@ -1813,8 +1795,8 @@
         var counter = 0;
         var maxCloseness = 30;
         var index = 0;
-        var maxPCA1 = 0;
-        var maxPCA2 = 0;
+        var maxPCA1 = pca1;
+        var maxPCA2 = pca2;
         while (counter < 5) {
             for (i = 0; i < PCAdata.length; i++) {
                 if (PCAdata[i].driver != selectedDriver && counter < 5) {
@@ -1844,10 +1826,7 @@
             index = 0;
         }
         
-        if (selectedDriver == "Hamilton_Lewis") {
-            maxPCA1 = relevantData[0].pca1;
-        }
-        else if (maxPCA1 < maxPCA2) {
+        if (maxPCA1 < maxPCA2) {
             maxPCA1 = maxPCA2
         } 
 
@@ -1934,7 +1913,7 @@
         });
         
         circles.on("click", function(d) {
-            if (activeDrivers.includes(d.driver) || retiredDrivers.includes(d.driver)) {
+            if (allDrivers.includes(d.driver)) {
                 selectedDriver = d.driver;
                 initializeChartsLayout(data, data2);
             }
@@ -1988,7 +1967,7 @@
         legend
             .on("mouseover", function(d) {
                 // Highlights the entry in the legend and outlines the right bars
-                if (activeDrivers.includes(d) || retiredDrivers.includes(d)) {
+                if (allDrivers.includes(d)) {
                     svgSimLegend.select(".rect"+d)
                         .attr("stroke", "black");
                     svgSimLegend.select(".text"+d)
@@ -2017,7 +1996,7 @@
                 labelAchievements.innerHTML = "";
             })
             .on("click", function(d) {
-                if (activeDrivers.includes(d) || retiredDrivers.includes(d)) {
+                if (allDrivers.includes(d)) {
                     selectedDriver = d;
                     initializeChartsLayout(data, data2);
                 }
@@ -2081,23 +2060,29 @@
     // Writes the right text on the upper right section of the application
     function writeOnAbout(index) {
         if (index == 0) {
-            about.innerHTML = "This VA application allows the user to find stats on Formula 1 drivers since 1994, so that they can gain a better knowledge of their skill and place in the sport.<br>";
+            about.innerHTML = "<b>- ABOUT -</b><br>";
+            about.innerHTML += "This VA application allows the user to find stats on Formula 1 drivers since 1994, so that they can gain a better knowledge of their skill and place in the sport.<br>";
             about.innerHTML += "<i>- Made by Luca Sannino as a project for Visual Analytics 2021 -</i>";
         }
         else if (index == 1) {
-            about.innerHTML = "This bar chart shows the total points achieved by the selected driver per season. The user can also switch to the avg. points per race (per season) and interact with the bars by clicking them to calculate new averages on-the-fly.";
+            about.innerHTML = "<b>- POINTS PER SEASON -</b><br>";
+            about.innerHTML += "This bar chart shows the total points achieved by the selected driver per season. The user can also switch to the avg. points per race (per season) and interact with the bars by clicking them to calculate new averages on-the-fly.";
         }
         else if (index == 2) {
-            about.innerHTML = "This bar chart shows how many times the selected driver has placed better than their teammates across the seasons. The user can also switch between race and qualifying results and interact with the legend to select a new driver.";
+            about.innerHTML = "<b>- WINS/LOSSES AGAINST TEAMMATES -</b><br>";
+            about.innerHTML += "This bar chart shows how many times the selected driver has placed better than their teammates across the seasons. The user can also switch between race and qualifying results and interact with the legend to select a new driver.";
         }
         else if (index == 3) {
-            about.innerHTML = "This lollipop chart shows the causes of DNFs. 'Physical' includes cases of external damage to the car (tyre punctures, broken wings etc.), while 'Mechanical' includes damage to the internal components (power loss, engine on fire etc.)."; 
+            about.innerHTML = "<b>- DNFs' CAUSES -</b><br>";
+            about.innerHTML += "This lollipop chart shows the causes of DNFs. 'Physical' includes cases of external damage to the car (tyre punctures, broken wings etc.), while 'Mechanical' includes damage to the internal components (power loss, engine on fire etc.)."; 
         }
         else if (index == 4) {
-            about.innerHTML = "This box-plot chart shows the distribution of the placements upon finishes. A quartile of the distribution falls in each of the four sections, meaning that the gray box represents ~50% of the placements.";
+            about.innerHTML = "<b>- PLACEMENTS' CONSISTENCY ON FINISHES -</b><br>";
+            about.innerHTML += "This box-plot chart shows the distribution of the placements upon finishes. A quartile of the distribution falls in each of the four sections, meaning that the gray box represents ~50% of the placements.";
         }
         else if (index == 5) {
-            about.innerHTML = "This scatter plot chart shows the five most similar drivers to the one selected in terms of career achievements. The closeness of the points was calculated using PCA on multidimensional data. Users can click on the drivers to see their stats.";
+            about.innerHTML = "<b>- TOP 5 DRIVERS WITH SIMILAR ACHIEVEMENTS -</b><br>";
+            about.innerHTML += "This scatter plot chart shows the five most similar drivers to the one selected in terms of career achievements. The closeness of the points was calculated using PCA on multidimensional data. Users can click on the drivers to see their stats.";
         }
     }
           
