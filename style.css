@@ -5,7 +5,7 @@
 #title {
     border: 3px solid black;
     width: 445px;
-    height: 70px;
+    height: 76px;
     display: inline-block;
     background: yellow;
     text-align: center;
@@ -17,11 +17,12 @@
 #menu {
     border: 3px solid black;
     width: 435px;
+    height: 70px;
     border-left: none;
     padding-left: 5px;
     padding-right: 5px;
-    padding-bottom: 5px;
-    padding-top: 10px;
+    padding-bottom: 3px;
+    padding-top: 3px;
     display: inline-block;
     background: yellow;
     text-align: center;
@@ -33,12 +34,12 @@
 #about {
     border: 3px solid black;
     width: 435px;
+    height: 71px;
     font-size: 13px;
     border-left: none;
     padding-left: 5px;
     padding-right: 5px;
-    padding-bottom: 5px;
-    padding-top: 10px;
+    padding-top: 5px;
     display: inline-block;
     background: yellow;
     text-align: center;

@@ -83,7 +83,7 @@
         title.id = "title";
         if (showTitleImage) {
             var image = document.createElement("img");
-            image.setAttribute("src", "Logo2.png");
+            image.setAttribute("src", "Logo3.png");
             image.setAttribute("height", "76px");
             image.setAttribute("width", "445px");
             title.appendChild(image);
@@ -437,10 +437,15 @@
         // Appends the yellow ending div
         var endingDiv = document.createElement('div');
         endingDiv.id = "endingdiv";
-        endingDiv.innerHTML = "- All data taken from: ";
+        endingDiv.innerHTML = "- All data taken from ";
         var link = document.createElement('a');
-        link.innerHTML = "https://www.kaggle.com/rohanrao/formula-1-world-championship-1950-2020";
+        link.innerHTML = "Kaggle";
         link.setAttribute('href', "https://www.kaggle.com/rohanrao/formula-1-world-championship-1950-2020");
+        endingDiv.appendChild(link);
+        endingDiv.innerHTML += " and integrated using ";
+        link = document.createElement('a');
+        link.innerHTML = "Talend";
+        link.setAttribute('href', "https://www.Talend.com");
         endingDiv.appendChild(link);
         endingDiv.innerHTML += " -";
         document.body.appendChild(endingDiv);
