@@ -34,7 +34,10 @@ def pca():
             points = element['points']
             poles = element['poles']
             wins = element['wins']
-            dataForPCA.append([championships, points, poles, wins])
+            podiums = element['podiums']
+            starts = element['starts']
+            finishes = element['finishes']
+            dataForPCA.append([championships, points, poles, wins, podiums, starts, finishes])
         print("Tuples for the PCA created!")
         
         # Transforms the data
@@ -53,7 +56,7 @@ def pca():
         if (showData):
             plt.plot(
                 dpca[:,0], 
-                dpca[:,0],
+                dpca[:,1],
                 'o',
                 markersize = 7,
                 color = 'green',

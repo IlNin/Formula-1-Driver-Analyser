@@ -14,12 +14,12 @@
     <script charset="utf-8">  
     // Dimensions
     var margins = {top: 20, right: 10, bottom: 40, left: 45};
-    var container_dimensions = {width: 550, height: 240}; 
+    var container_dimensions = {width: 551, height: 240}; 
     var chart_dimensions = {
         width: container_dimensions.width - margins.left - margins.right,
         height: container_dimensions.height - margins.top - margins.bottom
     };
-    var small_container_dimensions = {width: 445, height: 210};
+    var small_container_dimensions = {width: 446, height: 210};
     var small_chart_dimensions = {
         width: small_container_dimensions.width - margins.left - (margins.right + 30),
         height: small_container_dimensions.height - margins.top - margins.bottom
@@ -201,13 +201,23 @@
             var years = []; // Years where the championship was won
             var points = 0;
             var wins = 0;
+            var podiums = 0;
             var poles = 0;
+            var starts = 0;
+            var finishes = 0;
             
             data.forEach(function(d) {
                 if (driver == d.surname + "_" + d.name) {
+                    starts += 1;
                     points += parseInt(d.points);
-                    if (d.position == 1) {
-                        wins += 1;
+                    if (d.position >= 1 && d.position <= 3) {
+                        podiums += 1;
+                        if (d.position == 1) {
+                            wins += 1;
+                        }
+                    }
+                    if (d.status == "Finished" || d.status.substring(0, 1) == "+") {
+                        finishes += 1;
                     }
                 }
             });
@@ -244,7 +254,10 @@
                 years: years,
                 points: points,
                 wins: wins,
-                poles: poles
+                podiums: podiums,
+                poles: poles,
+                starts: starts,
+                finishes: finishes
             }
             achievements.push(newTuple);
         }     
@@ -258,7 +271,7 @@
                 'Access-Control-Allow-Origin':'*'
             }, */
             type: 'POST',
-            url: "https://formula-1-driver-analyser-pca.herokuapp.com/pca",
+            url: "http://127.0.0.1:5000/pca",
             data: JSON.stringify({value: achievements}),
             crossDomain: true,
             success: function (response) {
@@ -391,7 +404,10 @@
         for (i = 0; i < achievements.length; i++) {
             if (achievements[i].driver == selectedDriver) {
                 points = achievements[i].points;
+                starts = achievements[i].starts;
+                finishes = achievements[i].finishes;
                 wins = achievements[i].wins;
+                podiums = achievements[i].podiums;
                 poles = achievements[i].poles;
                 championships = achievements[i].championships;
                 years = achievements[i].years;
@@ -400,7 +416,7 @@
         var driverSelectedDiv = document.createElement('div');
         driverSelectedDiv.id = "selecteddriver";
         driverSelectedDiv.innerHTML = "<b>- " + selectedDriver.replace(/_/g, ' ') + " -</b><br>";
-        driverSelectedDiv.innerHTML += "<i>Points: </i>" + points + " - <i>Wins: </i>" + wins + " - <i>Poles: </i>" + poles + " - <i>Championships: </i>" + championships;
+        driverSelectedDiv.innerHTML += "<i>Points: </i>" + points + " --- <i>Starts: </i>" + starts + " --- <i>Finishes: </i>" + finishes + " --- <i>Podiums: </i>" + podiums + " --- <i>Wins: </i>" + wins + " --- <i>Poles: </i>" + poles + " --- <i>Championships: </i>" + championships;
         if (years.length > 0) {
             driverSelectedDiv.innerHTML += " [";
             for (i = 0; i < years.length-1; i++) {
@@ -638,7 +654,7 @@
                                 return 1;
                             }
                         })
-                        .attr("stroke-width", 3)
+                        .attr("stroke-width", 1)
                         .attr("x", x(year)) 
                         .attr("width", x.bandwidth)
                         .attr("y", y(0))
@@ -1562,7 +1578,7 @@
         
         // Initializes the x scale
         xCons = d3.scaleLinear()
-            .domain([1, 22])
+            .domain([22, 1])
             .range([0, small_chart_dimensions.width])
             
         // Initializes the axis
@@ -1615,23 +1631,23 @@
 
             // Draws the main horizontal line
             consSvg.append("line")
-                .attr("x1", xCons(min))
-                .attr("x2", xCons(min))
+                .attr("x1", xCons(max))
+                .attr("x2", xCons(max))
                 .attr("y1", yCenter)
                 .attr("y2", yCenter)
                 .attr("stroke", "black")
                 .style("opacity", 0)
                 .transition()
                     .duration(2000)
-                    .attr("x2", xCons(max))
+                    .attr("x1", xCons(min))
                     .style("opacity", 1);
 
             // Draws the box
             consSvg.append("rect")
-                .attr("x", xCons(q1))
+                .attr("x", xCons(q3))
                 .attr("y", yCenter - boxHeight/2)
                 .attr("height", boxHeight)
-                .attr("width", (xCons(q3)-xCons(q1)))
+                .attr("width", (xCons(q1)-xCons(q3)))
                 .style("stroke", "black")
                 .style("fill", "#69b3a2")
                 .style("opacity", 0)
@@ -1649,7 +1665,7 @@
                     else {
                         text = "50% of Placements: [" + q1 + ", " + q3 + "] ";
                     }
-                    drawOnMouseOverLabel(coords, consSvg, text, "black", q1, 1, 22);
+                    drawOnMouseOverLabel(coords, consSvg, text, "black", q3, 1, 1, 22);
                 })
                 .on("mouseout", function(d) {
                     d3.select(this).style("stroke-width", 1);
@@ -1692,7 +1708,17 @@
                     .attr("cx", function(d) { 
                         return xCons(d); 
                     })
-                    .attr("cy", yCenter + boxHeight/2)
+                    .attr("cy", function(d, i) {
+                        if (i == 0) {
+                            return yCenter;
+                        }
+                        else if (i == 1) {
+                            return (yCenter + boxHeight/2);
+                        }
+                        else {
+                            return (yCenter + boxHeight);
+                        }
+                    })
                     .attr("r", "4")
                     .style("fill", "#69b3a2")
                     .style("opacity", 0)
@@ -1757,6 +1783,9 @@
         svgSimDiv.appendChild(textDiv);
         labelAchievements = document.createElement('label');
         labelAchievements.style.fontSize = "12px";
+        labelAchievements.innerHTML = "<b>No Driver Highlighted</b><br>";
+        labelAchievements.innerHTML += "Points: ? - Starts: ? - Finishes: ? - Podiums: ? <br>";
+        labelAchievements.innerHTML += "Wins: ? - Poles: ? - Championships ?";
         textDiv.appendChild(labelAchievements);
         
         // Initializes the empty svg for the legend
@@ -1908,13 +1937,15 @@
                 }
             }
             labelAchievements.innerHTML = "<b>"+d.driver.replace(/_/g, ' ')+"</b><br>";
-            labelAchievements.innerHTML += "Points: " + currentDriverAchievements.points + " - Wins: " + currentDriverAchievements.wins;
-            labelAchievements.innerHTML += " - Poles: " + currentDriverAchievements.poles + " - Championships " + currentDriverAchievements.championships;
+            labelAchievements.innerHTML += "Points: " + currentDriverAchievements.points + " - Starts: " + currentDriverAchievements.starts + " - Finishes: " + currentDriverAchievements.finishes + " - Podiums: " + currentDriverAchievements.podiums + "<br>";
+            labelAchievements.innerHTML += "Wins: " + currentDriverAchievements.wins + " - Poles: " + currentDriverAchievements.poles + " - Championships " + currentDriverAchievements.championships;
         });
         
         circles.on("mouseout", function(d) {
             d3.select(this).attr("r", 6);
-            labelAchievements.innerHTML = "";
+            labelAchievements.innerHTML = "<b>No Driver Highlighted</b><br>";
+            labelAchievements.innerHTML += "Points: ? - Starts: ? - Finishes: ? - Podiums: ? <br>";
+            labelAchievements.innerHTML += "Wins: ? - Poles: ? - Championships ?";
         });
         
         circles.on("click", function(d) {
@@ -1986,9 +2017,9 @@
                         currentDriverAchievements = achievements[i];
                     }
                 }
-                labelAchievements.innerHTML = "<b>"+d.replace(/_/g, ' ')+"</b><br>";
-                labelAchievements.innerHTML += "Points: " + currentDriverAchievements.points + " - Wins: " + currentDriverAchievements.wins;
-                labelAchievements.innerHTML += " - Poles: " + currentDriverAchievements.poles + " - Championships " + currentDriverAchievements.championships;
+                labelAchievements.innerHTML = "<b>"+d.driver.replace(/_/g, ' ')+"</b><br>";
+                labelAchievements.innerHTML += "Points: " + currentDriverAchievements.points + " - Starts: " + currentDriverAchievements.starts + " - Finishes: " + currentDriverAchievements.finishes + " - Podiums: " + currentDriverAchievements.podiums + "<br>";
+                labelAchievements.innerHTML += "Wins: " + currentDriverAchievements.wins + " - Poles: " + currentDriverAchievements.poles + " - Championships " + currentDriverAchievements.championships;
             })
             .on("mouseout", function(d) {
                 // Restores everything
@@ -1998,7 +2029,9 @@
                     .attr("text-decoration", "none");
                 simSvg.select("."+d)
                     .attr("r", 6);
-                labelAchievements.innerHTML = "";
+                labelAchievements.innerHTML = "<b>No Driver Highlighted</b><br>";
+                labelAchievements.innerHTML += "Points: ? - Starts: ? - Finishes: ? - Podiums: ? <br>";
+                labelAchievements.innerHTML += "Wins: ? - Poles: ? - Championships ?";
             })
             .on("click", function(d) {
                 if (allDrivers.includes(d)) {

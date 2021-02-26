@@ -3,7 +3,7 @@
     display: flex;
 }
 #title {
-    border: 3px solid black;
+    border: 2px solid black;
     width: 445px;
     height: 76px;
     display: inline-block;
@@ -15,7 +15,7 @@
     animation-duration: 2s;
 }
 #menu {
-    border: 3px solid black;
+    border: 2px solid black;
     width: 435px;
     height: 70px;
     border-left: none;
@@ -32,8 +32,8 @@
     animation-duration: 2s;
 }
 #about {
-    border: 3px solid black;
-    width: 435px;
+    border: 2px solid black;
+    width: 438px;
     height: 71px;
     font-size: 13px;
     border-left: none;
@@ -51,9 +51,11 @@
 #selecteddriver {
     background: yellow;
     text-align: center;
-    width: 1341px;
-    border: 3px solid black;
+    width: 1342px;
+    border: 2px solid black;
     border-top: 0px;
+    padding-bottom: 1px;
+    padding-top: 1px;
     animation-name: fadeInOpacity;
     animation-iteration-count: 1;
     animation-timing-function: ease-in;
@@ -61,7 +63,7 @@
 }
 #middlewrapper {
     display: flex;
-    border: 3px solid black;
+    border: 2px solid black;
     border-top: 0px;
     width: fit-content;
     text-align: center;
@@ -72,7 +74,7 @@
 }  
 #bottomwrapper {
     display: flex;
-    border: 3px solid black;
+    border: 2px solid black;
     border-top: 0px;
     width: fit-content;
     text-align: center;
@@ -95,7 +97,7 @@
     padding-top: 6px;
     display: inline-block;
     text-align: center;
-    border-left: 3px solid black;
+    border-left: 2px solid black;
 }
 #cmplegendtable {
     padding-top: 6px;
@@ -111,13 +113,13 @@
     padding-top: 6px;
     display: inline-block;
     text-align: center;
-    border-left: 3px solid black;
+    border-left: 2px solid black;
 }
 #similar-drivers {
     padding-top: 6px;
     display: inline-block;
     text-align: center;
-    border-left: 3px solid black;
+    border-left: 2px solid black;
 }
 #simlegendtable {
     padding-top: 6px;
@@ -127,8 +129,8 @@
 #endingdiv {
     background: yellow;
     text-align: center;
-    width: 1341px;
-    border: 3px solid black;
+    width: 1342px;
+    border: 2px solid black;
     border-top: 0px;
     animation-name: fadeInOpacity;
     animation-iteration-count: 1;
