@@ -38,6 +38,9 @@
     var consTimeSliderSvg, consSvg, labelTotalRacesCons;
     var simSvg, svgSimLegend, labelAchievements;
     
+    // Colors
+    var colors = d3.scaleOrdinal(d3.schemeCategory20);
+    
     // User inputs
     var showTotalPoints = true; // Flag that indicates to show the total points instead of the average per race
     var showWinsInRaces = true; // Flag that indicates to show the wins in races instead of qualifying
@@ -63,6 +66,8 @@
     var maxYear; // Max year in which the driver has droven
     var constructors = []; // Keeps a list of constructors for which the driver has droven
     var constructorsDisabled = []; // List of constructors which the driver drove for that the user is not interested in
+    var teammates = []; // Keeps a list of the selected driver's teammates
+    var teammatesDisabled = []; // List of teammates that the user is not interested in
 
     // Avg line parameters
     var barsClicked = []; // List of bars clicked in the total points chart
@@ -398,6 +403,7 @@
         flagAddCircuits = 0;
         constructors = [];
         constructorsDisabled = []; 
+        teammates = [];
         
         selectedTrackDNF = 0;
         minYearSelectedDNF = 0;
@@ -408,6 +414,8 @@
         maxYearSelectedCons = 0;
         
         maxValueDNF = 0;
+        
+        colors = d3.scaleOrdinal(d3.schemeCategory20);
         
         // Appends the div with the name and stats of the driver selected
         var points;
@@ -599,9 +607,6 @@
             .domain([maxPoints, 0])
             .range([0, chart_dimensions.height]);
         
-        // Initializes the colors
-        colors = d3.scaleOrdinal(d3.schemeCategory20);
-        
         // Initializes the axis
         xAxis = d3.axisBottom(x).ticks().tickFormat(d3.format("d"));
         yAxis = d3.axisLeft(y).ticks().tickFormat(d3.format("d"));
@@ -665,7 +670,7 @@
                             return colors(constructor);
                         })
                         .style("opacity", function(d) {
-                            if (d.totalPoints == 0 || constructorsDisabled.includes(constructor)) {
+                            if (d.totalPoints == 0) {
                                 return 0; }
                             else {
                                 return 1;
@@ -738,6 +743,7 @@
                     if (d.totalPoints == 0) {
                         return;
                     }
+                    
                     // Selects the bar clicked, and also the other bars in the same year
                     year = d3.select(this).attr("class").substring(classLength-4, classLength);
                     selection = d3.selectAll("[class$='" + year + "']");
@@ -893,38 +899,69 @@
             .on("click", function(d) {
                 // Hides the data regarding that constructor in all the charts
                 if (!constructorsDisabled.includes(d)) {
-                    if (nBarsClicked != 0) {
-                        alert("Can't filter out data with the mean activated!");
+                    if (constructorsDisabled.length == constructors.length-1) {
+                        alert("Can't remove all constructors!");
                         return;
                     }
                     constructorsDisabled.push(d);
+                    
+                    // Disables the entry in the legend
                     d3.select(".rect"+d)
                         .style("fill", "grey");
                     d3.select(".text"+d)
                         .style("fill", "grey");
-                    barSvg.selectAll("[class*=" + d + "]")
-                        .style("opacity", 0); 
-                    plotDNF(data, minYearSelectedDNF, maxYearSelectedDNF, selectedTrackDNF);
-                    plotConsistency(data, minYearSelectedCons, maxYearSelectedCons, selectedTrackCons);
+                        
+                    /* Hides data in the teammates chart
+                    cmpSvg.selectAll("[class^=rect]")
+                        .style("opacity", function() {
+                            if (d3.select(this).attr("id") == d) {
+                                var teammate = d3.select(this).attr("class").substring(10, d3.select(this).attr("class").length);
+                                d3.select(".rect"+teammate)
+                                    .style("fill", "grey");
+                                d3.select(".text"+teammate)
+                                    .style("fill", "grey");
+                                return 0;
+                            }
+                            return d3.select(this).style("opacity");
+                        }); */
                 }
                 // Restores the data regarding that constructor in all the charts
                 else {
                     var index = constructorsDisabled.indexOf(d);
                     constructorsDisabled.splice(index, 1);
+                    
+                    // Restores the entry in the legend
                     d3.select(".rect"+d)
                         .style("fill", colors(d));
                     d3.select(".text"+d)
                         .style("fill", "black");
-                    barSvg.selectAll("[class*=" + d + "]")
-                        .style("opacity", function(d) {
-                            if (d3.select(this).attr("id") != 0) {
+
+                    /* Restores data in the teammates chart
+                    cmpSvg.selectAll("[class^=rect]")
+                        .style("opacity", function() {
+                            if (d3.select(this).attr("id") == d) {
+                                var teammate = d3.select(this).attr("class").substring(10, d3.select(this).attr("class").length);
+                                d3.select(".rect"+teammate)
+                                    .style("fill", colorsTeammates(teammate));
+                                d3.select(".text"+teammate)
+                                    .style("fill", "black");
                                 return 1;
                             }
-                            return 0;
-                        });
-                    plotDNF(data, minYearSelectedDNF, maxYearSelectedDNF, selectedTrackDNF);
-                    plotConsistency(data, minYearSelectedCons, maxYearSelectedCons, selectedTrackCons);
+                            return d3.select(this).style("opacity");
+                        }); */
                 }
+                
+                // Refresh the data in the charts
+                plotPointsAchieved(data);
+                maxValueDNF = 0;
+                minYearSelectedDNF = minYear;
+                maxYearSelectedDNF = maxYear;
+                minYearSelectedCons = minYear;
+                maxYearSelectedCons = maxYear;
+                drawDNFTimeSlider(data);
+                plotDNF(data, minYearSelectedDNF, maxYearSelectedDNF, selectedTrackDNF);
+                drawConsistencyTimeSlider(data);
+                plotConsistency(data, minYearSelectedCons, maxYearSelectedCons, selectedTrackCons);
             });
                     
     }
@@ -1147,7 +1184,7 @@
             
             // Refresh the list of teammates
             teammate = relevantData[i].key.substring(5, relevantData[i].key.length);
-            if (!teammates.includes(teammate) && relevantData[i].value.teammateWins > 0) {
+            if (!teammates.includes(teammate)) {
                 teammates.push(teammate);
             }
             
@@ -1157,6 +1194,9 @@
                     .data([relevantData[i].value]) // The [ ] parenthesis turn the object in an array
                     .enter()
                     .append("rect")
+                        .attr("id", function(d) {
+                            return d.constructor;
+                        })
                         .attr("class", function(d) {
                             if (j == 0) { // Index 0 means this is the selected driver
                                 return "rect0" + relevantData[i].key;
@@ -1300,6 +1340,8 @@
                         .style("stroke", "black");
                 }
                 else {
+                    cmpSvg.selectAll("[class^=rect0][class$=" + d + "]")
+                        .style("stroke", "black");
                     cmpSvg.selectAll("[class^=rect1][class$=" + d + "]")
                         .style("stroke", "black");
                 }
@@ -1389,6 +1431,9 @@
     
     // Draws a time slider for the DNF lollipop chart
     function drawDNFTimeSlider(data) {
+        // Erase previous data
+        dnfTimeSliderSvg.selectAll('*').remove();
+        
         // Creates and adds the time slider
         var sliderDNF = d3.sliderBottom()
             .min(minYear)
@@ -1598,8 +1643,11 @@
     
     // Draws a time slider fot the consistency plot box
     function drawConsistencyTimeSlider(data) {
+        // Erase previous data
+        consTimeSliderSvg.selectAll('*').remove();
+       
         // Creates and adds the time slider
-       var sliderConsistency = d3.sliderBottom()
+        var sliderConsistency = d3.sliderBottom()
             .min(minYear)
             .max(maxYear)
             .width(small_chart_dimensions.width)
@@ -1775,7 +1823,7 @@
                         d3.select(".rect_label").remove();
                     })   
                     .transition()
-                        .duration(2000)
+                        .duration(animationsSpeed)
                         .style("opacity", 1);
         }
             
@@ -2250,6 +2298,13 @@
             }
         }
         
+        filteredResults = [];
+        for (i = 0; i < relevantResults.length; i++) {
+            if (!constructorsDisabled.includes(relevantResults[i].constructor)) {
+                filteredResults.push(relevantResults[i]);
+            }
+        }
+        
         // Groups the relevant results by year/constructor and finds the total number of points by year/constructor
         if (showTotalPoints) {
             relevantResults = d3.nest()
@@ -2266,7 +2321,7 @@
                         })
                     }
                 })
-                .entries(relevantResults);
+                .entries(filteredResults);
         }
         // Groups the relevant results by year/constructor and finds the average number of points per race by year/constructor
         else {
@@ -2284,7 +2339,7 @@
                         })
                     }
                 })
-                .entries(relevantResults);
+                .entries(filteredResults);
         }
         
         /* DEBUG
@@ -2375,10 +2430,22 @@
                         }
                         return 0;
                     }),
+                    constructor: ""
                }
             })
             .entries(newTuples);   
-                
+        
+        // Adds the constructors to the data
+        relevantData.forEach(function(d) {
+            var year = d.key.substring(0, 4); 
+            var teammate = d.key.substring(5, d.key.length);
+            newTuples.forEach(function(f) {
+                if (f.year == year && ((f.teammateSurname + "_" + f.teammateName) == teammate)) {
+                    d.value.constructor = f.constructor;
+                }
+            });
+        });
+        
         /* DEBUG
         console.log(relevantData); */
         
