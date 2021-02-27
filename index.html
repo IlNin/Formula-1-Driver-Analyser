@@ -40,6 +40,7 @@
     
     // Colors
     var colors = d3.scaleOrdinal(d3.schemeCategory20);
+    var colorsTeammates = d3.scaleOrdinal(d3.schemeCategory20);
     
     // User inputs
     var showTotalPoints = true; // Flag that indicates to show the total points instead of the average per race
@@ -68,6 +69,7 @@
     var constructorsDisabled = []; // List of constructors which the driver drove for that the user is not interested in
     var teammates = []; // Keeps a list of the selected driver's teammates
     var teammatesDisabled = []; // List of teammates that the user is not interested in
+    var teammatesShowing = []; // List of teammates that are actually showing on the chart
 
     // Avg line parameters
     var barsClicked = []; // List of bars clicked in the total points chart
@@ -416,6 +418,7 @@
         maxValueDNF = 0;
         
         colors = d3.scaleOrdinal(d3.schemeCategory20);
+        colorsTeammates = d3.scaleOrdinal(d3.schemeCategory20);
         
         // Appends the div with the name and stats of the driver selected
         var points;
@@ -458,7 +461,7 @@
         document.body.append(wrapper);
         
         // Prepares all the layouts in the middle wrapper
-        preparePointsAchieved(data);    
+        preparePointsAchieved(data, data2);    
         prepareComparisons(data, data2);
         
         // Initializes the bottom wrapper
@@ -490,7 +493,7 @@
     }
     
     // Prepares the layout for the points achieved chart
-    function preparePointsAchieved(data) { 
+    function preparePointsAchieved(data, data2) { 
         // Initializes the div that contains the svg area for the points bars    
         var svgDiv = document.createElement('div');
         svgDiv.id = "bargraph";
@@ -565,11 +568,11 @@
                     .attr("id","legendtable");
         
         // Plots the bar graph that shows the points achieved by the driver season by season
-        plotPointsAchieved(data);
+        plotPointsAchieved(data, data2);
     }
           
     // Plot a bar graph that shows the points achieved by the driver season by season
-    function plotPointsAchieved(data) {
+    function plotPointsAchieved(data, data2) {
         // Erase previous data
         barSvg.selectAll('*').remove();
         barsClicked = []; 
@@ -818,11 +821,11 @@
         }
         
         // Draws the legend for the graph
-        drawPointsAchievedLegend(data);      
+        drawPointsAchievedLegend(data, data2);      
     }
         
     // Draws the legend for the points bar graph
-    function drawPointsAchievedLegend(data) {
+    function drawPointsAchievedLegend(data, data2) {
         // Erase previous data
         svgLegend.selectAll('*').remove();
         
@@ -905,25 +908,25 @@
                     }
                     constructorsDisabled.push(d);
                     
-                    // Disables the entry in the legend
+                    // Disables the entry in the constructor legend
                     d3.select(".rect"+d)
                         .style("fill", "grey");
                     d3.select(".text"+d)
                         .style("fill", "grey");
                         
-                    /* Hides data in the teammates chart
-                    cmpSvg.selectAll("[class^=rect]")
+                    /* Disables the right teammates
+                    cmpSvg.selectAll("[class^=rect1]")
                         .style("opacity", function() {
                             if (d3.select(this).attr("id") == d) {
                                 var teammate = d3.select(this).attr("class").substring(10, d3.select(this).attr("class").length);
-                                d3.select(".rect"+teammate)
-                                    .style("fill", "grey");
-                                d3.select(".text"+teammate)
-                                    .style("fill", "grey");
-                                return 0;
+                                if (!teammatesDisabled.includes(teammate)) {
+                                    teammatesDisabled.push(teammate);
+                                }
+                                return d3.select(this).style("opacity");
                             }
                             return d3.select(this).style("opacity");
                         }); */
+                        
                 }
                 // Restores the data regarding that constructor in all the charts
                 else {
@@ -936,23 +939,29 @@
                     d3.select(".text"+d)
                         .style("fill", "black");
 
-                    /* Restores data in the teammates chart
-                    cmpSvg.selectAll("[class^=rect]")
+                    /* Restores entries in the teammates chart
+                    cmpSvg.selectAll("[class^=rect1]")
                         .style("opacity", function() {
                             if (d3.select(this).attr("id") == d) {
                                 var teammate = d3.select(this).attr("class").substring(10, d3.select(this).attr("class").length);
+                                console.log(teammate);
                                 d3.select(".rect"+teammate)
                                     .style("fill", colorsTeammates(teammate));
                                 d3.select(".text"+teammate)
                                     .style("fill", "black");
-                                return 1;
+                                if (teammatesDisabled.includes(teammate)) {
+                                    index = teammatesDisabled.indexOf(teammate);
+                                    teammatesDisabled.splice(index, 1);
+                                }
+                                return d3.select(this).style("opacity");
                             }
                             return d3.select(this).style("opacity");
                         }); */
                 }
                 
                 // Refresh the data in the charts
-                plotPointsAchieved(data);
+                plotPointsAchieved(data, data2);
+                plotComparisons(data, data2);
                 maxValueDNF = 0;
                 minYearSelectedDNF = minYear;
                 maxYearSelectedDNF = maxYear;
@@ -962,8 +971,7 @@
                 plotDNF(data, minYearSelectedDNF, maxYearSelectedDNF, selectedTrackDNF);
                 drawConsistencyTimeSlider(data);
                 plotConsistency(data, minYearSelectedCons, maxYearSelectedCons, selectedTrackCons);
-            });
-                    
+            });          
     }
     
     // Prepares the layout for the comparisons with teammates chart
@@ -1036,6 +1044,7 @@
             .append('svg')
                 .attr("width", legend_width)
                 .attr("height", container_dimensions.height)
+                .attr("class", "svgCmp")
                 // .style("background-color", "red")
                 .append("g")
                     .attr("transform", "translate(" + 0 + "," + margins.top/4 + ")")
@@ -1100,10 +1109,7 @@
         yBottom = d3.scaleLinear()
             .domain([0, maxWins])
             .range([0, chart_dimensions.height/2]);
-        
-        // Initializes the colors
-        colorsTeammates = d3.scaleOrdinal(d3.schemeCategory20);
-        
+            
         // Initializes the axis
         xAxis = d3.axisBottom(x).ticks().tickFormat(d3.format("d"));
         yTopAxis = d3.axisLeft(yTop).ticks(4).tickFormat(d3.format("d"));
@@ -1163,8 +1169,11 @@
             });
         
         // Plot the data
-        teammates = []; // Contains the list of drivers involved in the comparison
-        teammates.push(selectedDriver);
+        if (!teammates.includes(selectedDriver)) {
+            teammates.push(selectedDriver);
+        }
+        teammatesShowing = [];
+        teammatesShowing.push(selectedDriver);
         previousYear = 0; // Previous year found while cycling through the data
         barBelowTopY = 0; // Size of the bar on the top Y if there's one below the current one
         barAboveBottomY = 0; // Size of the bar on the bottom Y if there's one above the current one
@@ -1186,6 +1195,9 @@
             teammate = relevantData[i].key.substring(5, relevantData[i].key.length);
             if (!teammates.includes(teammate)) {
                 teammates.push(teammate);
+            }
+            if (!teammatesShowing.includes(teammate)) {
+                teammatesShowing.push(teammate);
             }
             
             // Plot selected driver and teammate
@@ -1290,6 +1302,10 @@
         // Erase previous data
         svgCmpLegend.selectAll('*').remove();
         
+        if (teammates.length > 15) {
+            d3.select(".svgCmp").attr("height", teammates.length*sizeSquare*1.5);
+        }
+        
         // Prepares the space/layout for the legend
         sizeSquare = 10;
         legend = svgCmpLegend.selectAll("legend")
@@ -1309,7 +1325,10 @@
                 return "rect"+d;
             })
 			.style("fill", function(d){
-                return colorsTeammates(d);
+                if (teammatesShowing.includes(d)) {
+                    return colorsTeammates(d);
+                }
+                return "grey";
 			});
             
         // Writes the text near the small colored rectangles
@@ -1321,6 +1340,12 @@
             .attr("y", sizeSquare/2)
             .attr("dy", ".35em")
             .style("font", "12px times")
+            .style("fill", function(d) {
+                if (teammatesShowing.includes(d)) {
+                    return "black";
+                }
+                return "grey";
+            })
             .text(function(d) {
                 return d.replace(/_/g, ' ');
             });
@@ -2376,6 +2401,12 @@
                     j = -1;
                 }
                 else if ((constructorResults[j].surname + "_" + constructorResults[j].name) != selectedDriver && findTeammates == true) {
+                    if (constructorsDisabled.includes(constructorResults[j].constructor)) {
+                        continue;
+                    }
+                    /*if (teammatesDisabled.includes(constructorResults[j].surname + "_" + constructorResults[j].name)) {
+                        continue;
+                    } */
                     newTuple = {
                         year: constructorResults[j].year,
                         round: constructorResults[j].round,

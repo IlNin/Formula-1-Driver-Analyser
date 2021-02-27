@@ -95,6 +95,8 @@
     padding-top: 6px;
     display: inline-block;
     text-align: center;
+    height: 280px;
+    overflow-y: auto;
 }
 #dnf {
     padding-top: 6px;
