@@ -1,6 +1,10 @@
 #abovewrapper {
     width: fit-content;
     display: flex;
+    animation-name: fadeInOpacity;
+    animation-iteration-count: 1;
+    animation-timing-function: ease-in;
+    animation-duration: 1s;
 }
 #title {
     border: 2px solid black;
@@ -9,10 +13,6 @@
     display: inline-block;
     background: yellow;
     text-align: center;
-    animation-name: fadeInOpacity;
-    animation-iteration-count: 1;
-    animation-timing-function: ease-in;
-    animation-duration: 2s;
 }
 #menu {
     border: 2px solid black;
@@ -26,10 +26,6 @@
     display: inline-block;
     background: yellow;
     text-align: center;
-    animation-name: fadeInOpacity;
-    animation-iteration-count: 1;
-    animation-timing-function: ease-in;
-    animation-duration: 2s;
 }
 #about {
     border: 2px solid black;
@@ -43,10 +39,6 @@
     display: inline-block;
     background: yellow;
     text-align: center;
-    animation-name: fadeInOpacity;
-    animation-iteration-count: 1;
-    animation-timing-function: ease-in;
-    animation-duration: 2s;
 }
 #selecteddriver {
     background: yellow;
@@ -59,7 +51,7 @@
     animation-name: fadeInOpacity;
     animation-iteration-count: 1;
     animation-timing-function: ease-in;
-    animation-duration: 2s;
+    animation-duration: 1s;
 }
 #middlewrapper {
     display: flex;
@@ -70,7 +62,7 @@
     animation-name: fadeInOpacity;
     animation-iteration-count: 1;
     animation-timing-function: ease-in;
-    animation-duration: 2s;
+    animation-duration: 1s;
 }  
 #bottomwrapper {
     display: flex;
@@ -81,7 +73,7 @@
     animation-name: fadeInOpacity;
     animation-iteration-count: 1;
     animation-timing-function: ease-in;
-    animation-duration: 2s;
+    animation-duration: 1s;
 }  
 #bargraph {
     padding-top: 6px;
@@ -135,7 +127,7 @@
     animation-name: fadeInOpacity;
     animation-iteration-count: 1;
     animation-timing-function: ease-in;
-    animation-duration: 2s;
+    animation-duration: 1s;
 }
             
 @keyframes fadeInOpacity {
