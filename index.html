@@ -2780,24 +2780,24 @@
                     if (!circuits.includes(values[j].circuit)) {
                         circuits.push(values[j].circuit);
                     }
+                    
+                    // Check if the current race was set in a circuit selected by the user
+                    if (index != 0 && circuits[index-1] != values[j].circuit) {
+                        continue;
+                    }
+                    
+                    // Check if the driver was driving for a filtered out constructor
+                    if (constructorsDisabled.includes(values[j].constructor)) {
+                        continue;
+                    }
+                    
+                    // Check if driver was driving in the selected time frame
                     if (values[j].year >= minYear && values[j].year <= maxYear) {
                         starts += 1;
                         
                         // Check if the driver reached the finish line
                         if (values[j].status == "Finished" || values[j].status.substring(0, 1) == "+") {
-                        
-                            // Check if the current race was set in a circuit selected by the user
-                            if (index != 0 && circuits[index-1] != values[j].circuit) {
-                                starts += -1;
-                                continue;
-                            }
-                            
-                            // Check if the driver was driving for a filtered out constructor
-                            if (constructorsDisabled.includes(values[j].constructor)) {
-                                starts += -1;
-                                continue;
-                            }
-                            
+    
                             // Refresh wins/podiums counter
                             if (parseInt(values[j].position) >= 1 && parseInt(values[j].position) <= 3) {
                                 podiums += 1;
@@ -2805,7 +2805,6 @@
                                     wins += 1;
                                 }
                             }
-                            console.log(values[j]);
                             relevantResults.push(parseInt(values[j].position));
                         }
                     }
