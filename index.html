@@ -2469,8 +2469,10 @@
                     // Restore a constructor if the user has filtered in a driver which drove for a previously filtered out constructor
                     if (lastTeammateEnabled == (constructorResults[j].surname + "_" + constructorResults[j].name)) {
                         lastTeammateEnabled = "";
-                        var index = constructorsDisabled.indexOf(constructorResults[j].constructor);
-                        constructorsDisabled.splice(index, 1);
+                        if (constructorsDisabled.includes(constructorResults[j].constructor)) {
+                            var index = constructorsDisabled.indexOf(constructorResults[j].constructor);
+                            constructorsDisabled.splice(index, 1);
+                        }
                     }
                     
                     // The data is not of interest because the constructor is filtered out
