@@ -403,7 +403,7 @@
         // Restores global variables
         showTotalPoints = true;
         showWinsInRaces = true;
-        showTop5 = true;
+        PCAmode = 0;
         circuits = [];
         flagAddCircuits = 0;
         constructors = [];
@@ -1381,12 +1381,11 @@
             .on("mouseover", function(d) {
                 // Highlights the entry in the legend and outlines the right bars
                 document.body.style.cursor = "pointer";
-                if (allDrivers.includes(d)) {
-                    d3.select(".rect"+d)
-                        .attr("stroke", "black");
-                    d3.select(".text"+d)
-                        .attr("text-decoration", "underline overline");    
-                }
+                d3.select(".rect"+d)
+                    .attr("stroke", "black");
+                d3.select(".text"+d)
+                    .attr("text-decoration", "underline overline");    
+
                 if (d == selectedDriver) {
                     cmpSvg.selectAll("[class^=rect0]")
                         .style("stroke", "black");
@@ -1972,7 +1971,9 @@
         svgSimLegendDiv.onmouseover = function() {
             writeOnAbout(5);
         }
-        bottomWrapper.append(svgSimLegendDiv);
+        var div = document.createElement('div');
+        div.append(svgSimLegendDiv);
+        bottomWrapper.append(div);
         
         // Text under the graph
         var textDiv = document.createElement('div');
@@ -1988,7 +1989,8 @@
         svgSimLegend = d3.select('#simlegendtable')
             .append('svg')
                 .attr("width", legend_width)
-                .attr("height", small_container_dimensions.height/2)
+                .attr("height", small_container_dimensions.height-30)
+                .attr("class", ".svgSim")
                 //.style("background-color", "red")
                 .append("g")
                     .attr("transform", "translate(" + 0 + "," + margins.top/4 + ")")
@@ -1996,7 +1998,9 @@
         
         // Radio buttons under the legend
         var optionsDiv = document.createElement('div');
-        svgSimLegendDiv.appendChild(optionsDiv);
+        div.appendChild(optionsDiv);
+        optionsDiv.style.fontSize = "14px";
+        optionsDiv.style.textAlign = "left";
         optionsDiv.innerHTML = "Focus On: <br>";
         
         var everyoneButton = document.createElement('input');
@@ -2005,7 +2009,7 @@
         everyoneButton.id = 'show-everyone';
         everyoneButton.value = "show-everyone";
         var label = document.createElement('label');
-        label.innerHTML = "Everyone&nbsp&nbsp&nbsp";
+        label.innerHTML = "Everyone";
         optionsDiv.appendChild(everyoneButton);
         optionsDiv.appendChild(label);
         optionsDiv.innerHTML += "<br>";
@@ -2016,8 +2020,30 @@
         top5Button.id = 'show-top5';
         top5Button.value = 'show-top5';
         label = document.createElement('label');
-        label.innerHTML = "Closest 5&nbsp";
+        label.innerHTML = "Closest 5";
         optionsDiv.appendChild(top5Button);
+        optionsDiv.appendChild(label);
+        optionsDiv.innerHTML += "<br>";
+        
+        var top10Button = document.createElement('input');
+        top10Button.type = 'radio';
+        top10Button.name = 'pca-mode';
+        top10Button.id = 'show-top10';
+        top10Button.value = 'show-top10';
+        label = document.createElement('label');
+        label.innerHTML = "Closest 10";
+        optionsDiv.appendChild(top10Button);
+        optionsDiv.appendChild(label);
+        optionsDiv.innerHTML += "<br>";
+        
+        var teammatesButton = document.createElement('input');
+        teammatesButton.type = 'radio';
+        teammatesButton.name = 'pca-mode';
+        teammatesButton.id = 'show-teammates';
+        teammatesButton.value = 'show-teamamtes';
+        label = document.createElement('label');
+        label.innerHTML = "Teammates";
+        optionsDiv.appendChild(teammatesButton);
         optionsDiv.appendChild(label);
         document.getElementById("show-everyone").checked = true;
  
@@ -2028,6 +2054,15 @@
  
         document.getElementById('show-top5').onclick = function() {
             PCAmode = 1;
+            plotPCA(data, data2);
+        }
+        
+        document.getElementById('show-top10').onclick = function() {
+            PCAmode = 2;
+            plotPCA(data, data2);
+        }
+        document.getElementById('show-teammates').onclick = function() {
+            PCAmode = 3;
             plotPCA(data, data2);
         }
   
@@ -2046,8 +2081,8 @@
         simSvg.selectAll('*').remove();
         
         // Gets PCA values of the selected driver
+        var notableDrivers = [selectedDriver];
         relevantData = [];
-        var similarDrivers = [selectedDriver];
         pca1 = 0;
         pca2 = 0;
         for (i = 0; i < PCAdata.length; i++) {
@@ -2058,35 +2093,53 @@
             }
         }   
         
-        // Finds the top 5 most similar drivers
-        chosenIndexes = [];
-        var counter = 0;
-        var maxCloseness = 30;
-        var index = 0;
-        while (counter < 5) {
-            for (i = 0; i < PCAdata.length; i++) {
-                if (PCAdata[i].driver != selectedDriver && counter < 5) {
-                    var a = pca1 - PCAdata[i].pca1;
-                    var b = pca2 - PCAdata[i].pca2;
-                    var closeness = Math.sqrt(a*a + b*b);
-                    if (closeness < maxCloseness && !chosenIndexes.includes(i)) {
-                        maxCloseness = closeness;
-                        index = i;
+        // Finds the top most similar drivers
+        if (PCAmode == 1 || PCAmode == 2) {
+            var top = 0;
+            if (PCAmode == 1) {
+                top = 5;
+            }
+            else {
+                top = 10;
+            }
+            chosenIndexes = [];
+            var counter = 0;
+            var maxCloseness = 30;
+            var index = 0;
+            while (counter < top) {
+                for (i = 0; i < PCAdata.length; i++) {
+                    if (PCAdata[i].driver != selectedDriver && counter < top) {
+                        var a = pca1 - PCAdata[i].pca1;
+                        var b = pca2 - PCAdata[i].pca2;
+                        var closeness = Math.sqrt(a*a + b*b);
+                        if (closeness < maxCloseness && !chosenIndexes.includes(i)) {
+                            maxCloseness = closeness;
+                            index = i;
+                        }
                     }
                 }
+                if (!chosenIndexes.includes(index)) {
+                    relevantData.push(PCAdata[index]);
+                    notableDrivers.push(PCAdata[index].driver);
+                    chosenIndexes.push(index);
+                } 
+                counter += 1;
+                maxCloseness = 30;
+                index = 0;
             }
-            if (!chosenIndexes.includes(index)) {
-                relevantData.push(PCAdata[index]);
-                similarDrivers.push(PCAdata[index].driver);
-                chosenIndexes.push(index);
-            } 
-            counter += 1;
-            maxCloseness = 30;
-            index = 0;
         }
+        // Finds the the PC values of the teammates
+        else if (PCAmode == 3) {
+            for (i = 0; i < PCAdata.length; i++) {
+                if (PCAdata[i].driver != selectedDriver && teammates.includes(PCAdata[i].driver)) {
+                    relevantData.push(PCAdata[i]);
+                    notableDrivers.push(PCAdata[i].driver);
+                }
+            }
+        }   
 
         // Initializes the PCA1 and PCA2 scales
-        if (showTop5) {
+        if (PCAmode != 0) {
             pca1Scale = d3.scaleLinear()
                 .domain(d3.extent(relevantData, function(d) {
                     return d.pca1;
@@ -2109,7 +2162,7 @@
                     return d.pca2;
                 }).reverse())
                 .range([0, 200]);
-            similarDrivers.push("Other");
+            notableDrivers.push("Other");
         }
                
         // Initializes the axis
@@ -2157,20 +2210,20 @@
                     return pca2Scale(d.pca2); 
                 })
                 .attr("r", function(d) {
-                    if (!similarDrivers.includes(d.driver)) {
+                    if (!notableDrivers.includes(d.driver)) {
                         return 3;
                     }
                     return 6;
                 })
                 .style("opacity", function(d) {
-                    if (!similarDrivers.includes(d.driver) && showTop5 == true) {
+                    if (!notableDrivers.includes(d.driver) && PCAmode != 0) {
                         return 0;
                     }
                     return 1;
                 })
                 .style("fill", function(d) {
-                    if (!similarDrivers.includes(d.driver)) {  
-                        return colorsTeammates("Other");
+                    if (!notableDrivers.includes(d.driver)) {  
+                        return "orange";
                     }
                     return colorsTeammates(d.driver);
                 })
@@ -2214,18 +2267,23 @@
         });
         
         // Draws the legend
-        plotPCALegend(data, data2, similarDrivers);
+        plotPCALegend(data, data2, notableDrivers);
     }
     
     // Draws the legend for the similar drivers chart
-    function plotPCALegend(data, data2, similarDrivers) {
+    function plotPCALegend(data, data2, notableDrivers) {
         // Erase previous data
         svgSimLegend.selectAll('*').remove();
+        
+         // Resize the legend if there too many entries
+        if (teammates.length > 11) {
+            d3.select(".svgSim").attr("height", teammates.length*sizeSquare*1.5);
+        }
         
         // Prepares the space/layout for the legend
         sizeSquare = 10;
         legend = svgSimLegend.selectAll("legend")
-            .data(similarDrivers)
+            .data(notableDrivers)
             .enter()
             .append("g")
             .attr("class", "legend")
@@ -2241,6 +2299,9 @@
                 return "rect"+d;
             })
 			.style("fill", function(d){
+                if (d == "Other") {
+                    return "orange";
+                }
                 return colorsTeammates(d);
 			});
             
@@ -2261,6 +2322,9 @@
         legend
             .on("mouseover", function(d) {
                 // Highlights the entry in the legend and outlines the right bars
+                if (d == "Other") {
+                    return;
+                }
                 if (allDrivers.includes(d)) {
                     svgSimLegend.select(".rect"+d)
                         .attr("stroke", "black");
