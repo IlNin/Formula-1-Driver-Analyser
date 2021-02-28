@@ -1076,8 +1076,6 @@
         }
         
         // Initializes the x scale and finds the range of seasons
-        minYear = relevantData[0].key.substring(0, 4);
-        maxYear = relevantData[relevantData.length-1].key.substring(0, 4);
         x = d3.scaleBand()
             .domain(relevantData.map(function(d) {
                 return d.key.substring(0, 4);
@@ -1514,6 +1512,9 @@
     function drawDNFTimeSlider(data) {
         // Erase previous data
         dnfTimeSliderSvg.selectAll('*').remove();
+        
+        console.log(minYear);
+        console.log(maxYear);
         
         // Creates and adds the time slider
         var sliderDNF = d3.sliderBottom()
