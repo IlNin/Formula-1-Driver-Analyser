@@ -480,7 +480,7 @@
         // Prepares all the layouts in the bottom wrapper
         prepareDNF(data);
         prepareConsistency(data);
-        prepareSimilarDrivers(data, data2);
+        preparePCA(data, data2);
         
         // Appends the yellow ending div
         var endingDiv = document.createElement('div');
@@ -523,6 +523,7 @@
         // Adds radios button in order to switch between total points and average points per race
         var optionsDiv = document.createElement('div');
         svgDiv.appendChild(optionsDiv);
+        optionsDiv.style.fontSize = "14px";
         optionsDiv.innerHTML = "Show: ";
         var totalButton = document.createElement('input');
         totalButton.type = 'radio';
@@ -1015,6 +1016,7 @@
         // Adds radios button in order to switch between total points and average points per race
         optionsDiv = document.createElement('div');
         svgCmpDiv.appendChild(optionsDiv);
+        optionsDiv.style.fontSize = "14px";
         optionsDiv.innerHTML = "Show: ";
         winsRacesButton = document.createElement('input');
         winsRacesButton.type = 'radio';
@@ -1479,6 +1481,7 @@
         // Adds the track selector with input event
         var svgDNFDiv2 = document.createElement('div');
         svgDNFDiv.appendChild(svgDNFDiv2);
+        svgDNFDiv.style.fontSize = "14px";
         svgDNFDiv2.appendChild(document.createTextNode("Show DNFs from: "));
         var selectTrack = document.createElement('select');
         selectTrack.id = "select-track-dnf";
@@ -1691,6 +1694,7 @@
         // Adds the track selector with input event
         var svgConsDiv2 = document.createElement('div');
         svgConsDiv.appendChild(svgConsDiv2);
+        svgConsDiv.style.fontSize = "14px";
         svgConsDiv2.appendChild(document.createTextNode("Show placements from: "));
         var selectTrack = document.createElement('select');
         selectTrack.id = "select-track-cons";
@@ -1941,11 +1945,11 @@
     }
     
     // Prepares the layout for the chart that displays the PCA
-    function prepareSimilarDrivers(data, data2) {
+    function preparePCA(data, data2) {
         // Initializes the div that contains the svg area for the PCA  
         svgSimDiv = document.createElement('div');
         svgSimDiv.id = "similar-drivers";
-        svgSimDiv.innerHTML = "<b>Place In The Sport History</b><br>";
+        svgSimDiv.innerHTML = "<b>Place In The Sport's History</b><br>";
         svgSimDiv.onmouseover = function() {
             writeOnAbout(5);
         }
@@ -2210,11 +2214,11 @@
         });
         
         // Draws the legend
-        plotSimilarDriversLegend(data, data2, similarDrivers);
+        plotPCALegend(data, data2, similarDrivers);
     }
     
     // Draws the legend for the similar drivers chart
-    function plotSimilarDriversLegend(data, data2, similarDrivers) {
+    function plotPCALegend(data, data2, similarDrivers) {
         // Erase previous data
         svgSimLegend.selectAll('*').remove();
         
