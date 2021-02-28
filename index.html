@@ -2788,13 +2788,13 @@
                         
                             // Check if the current race was set in a circuit selected by the user
                             if (index != 0 && circuits[index-1] != values[j].circuit) {
-                                starts -= 1;
+                                starts += -1;
                                 continue;
                             }
                             
                             // Check if the driver was driving for a filtered out constructor
                             if (constructorsDisabled.includes(values[j].constructor)) {
-                                starts -= 1;
+                                starts += -1;
                                 continue;
                             }
                             
@@ -2805,10 +2805,8 @@
                                     wins += 1;
                                 }
                             }
+                            console.log(values[j]);
                             relevantResults.push(parseInt(values[j].position));
-                        }
-                        else {
-                            starts -= 1;
                         }
                     }
                 }
