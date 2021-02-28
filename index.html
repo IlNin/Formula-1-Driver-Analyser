@@ -45,7 +45,6 @@
     // User inputs
     var showTotalPoints = true; // Flag that indicates to show the total points instead of the average per race
     var showWinsInRaces = true; // Flag that indicates to show the wins in races instead of qualifying
-    var showTop5 = true;
     
     var selectedTrackDNF = 0;
     var minYearSelectedDNF = 0;
@@ -54,6 +53,8 @@
     var selectedTrackCons = 0;
     var minYearSelectedCons = 0;
     var maxYearSelectedCons = 0;
+    
+    var PCAmode = 0; // 0: Show Everyone; 1: Show Top 5
     
     // Drivers data
     var allDrivers = []; // List of drivers loaded by the data
@@ -556,7 +557,7 @@
       
         // Initializes the div for the points bar graph legend
         svgLegendDiv = document.createElement('div');
-        svgLegendDiv.innerHTML = "Legend Table<br>";
+        svgLegendDiv.innerHTML = "Constructors<br>";
         svgLegendDiv.id = "legendtable";
         svgLegendDiv.onmouseover = function() {
             writeOnAbout(1);
@@ -882,7 +883,7 @@
         // Add input events to the legend
         legend
             .on("mouseover", function(d) {
-                // Highlights the entry in the legend and outlines the right bars
+                // Highlights the entry in the legend and outlines the right bars, both in the points and teammates charts
                 document.body.style.cursor = "pointer";
                 d3.select(".rect"+d)
                     .attr("stroke", "black");
@@ -890,7 +891,14 @@
                     .attr("text-decoration", "underline overline");
                 if (nBarsClicked == 0) {
                     barSvg.selectAll("[class*=" + d + "]")
-                        .style("stroke", "black");        
+                        .style("stroke", "black"); 
+                    cmpSvg.selectAll("[class^=rect]")
+                        .style("stroke", function() {
+                            if (d3.select(this).attr("id") == d) {
+                                return "black";
+                            }
+                            return d3.select(this).style("stroke");
+                        }); 
                 }
             })
             .on("mouseout", function(d) {
@@ -903,6 +911,8 @@
                 if (nBarsClicked == 0) {
                     barSvg.selectAll("[class*=" + d + "]")
                         .style("stroke", "none"); 
+                    cmpSvg.selectAll("[class^=rect]")
+                        .style("stroke", "white");
                 }
             })
             .on("click", function(d) {
@@ -1039,7 +1049,7 @@
         
         // Initializes the div for the points bar graph legend
         svgCmpLegendDiv = document.createElement('div');
-        svgCmpLegendDiv.innerHTML = "Legend Table<br>";
+        svgCmpLegendDiv.innerHTML = "Drivers<br>";
         svgCmpLegendDiv.id = "cmplegendtable";
         svgCmpLegendDiv.onmouseover = function() {
             writeOnAbout(2);
@@ -1513,9 +1523,6 @@
         // Erase previous data
         dnfTimeSliderSvg.selectAll('*').remove();
         
-        console.log(minYear);
-        console.log(maxYear);
-        
         // Creates and adds the time slider
         var sliderDNF = d3.sliderBottom()
             .min(minYear)
@@ -1759,8 +1766,6 @@
         // Finds the relevant data
         var relevantData = findPlacements(data, selectedMinYear, selectedMaxYear, selectedTrack);
         var stats = relevantData.pop();
-        console.log(relevantData);
-        console.log(stats);
         
         // Adds data about circuits if not already done
         if (flagAddCircuits == 0) {
@@ -1935,18 +1940,18 @@
         labelTotalRacesCons.innerHTML += "&nbsp&nbsp&nbsp<b>Podiums</b>: " + stats.podiums + " (" + podiumsRatio.toFixed(2) + "%)";
     }
     
-    // Prepares the layout for the chart that displays similar drivers to the one selected
+    // Prepares the layout for the chart that displays the PCA
     function prepareSimilarDrivers(data, data2) {
-        // Initializes the div that contains the svg area for the points bars    
+        // Initializes the div that contains the svg area for the PCA  
         svgSimDiv = document.createElement('div');
         svgSimDiv.id = "similar-drivers";
-        svgSimDiv.innerHTML = "<b>Top 5 Drivers With Similar Achievements</b><br>";
+        svgSimDiv.innerHTML = "<b>Place In The Sport History</b><br>";
         svgSimDiv.onmouseover = function() {
             writeOnAbout(5);
         }
         bottomWrapper.append(svgSimDiv); 
         
-        // Initalizes an empty svg for the similar drivers chart
+        // Initalizes an empty svg for the PCA chart
         simSvg = d3.select('#similar-drivers')
             .append('svg')
                 .attr("width", small_container_dimensions.width-119)
@@ -1958,7 +1963,7 @@
         
         // Initializes the div for the legend
         svgSimLegendDiv = document.createElement('div');
-        svgSimLegendDiv.innerHTML = "Legend Table<br>";
+        svgSimLegendDiv.innerHTML = "Drivers<br>";
         svgSimLegendDiv.id = "simlegendtable";
         svgSimLegendDiv.onmouseover = function() {
             writeOnAbout(5);
@@ -1988,48 +1993,51 @@
         // Radio buttons under the legend
         var optionsDiv = document.createElement('div');
         svgSimLegendDiv.appendChild(optionsDiv);
-        optionsDiv.innerHTML = "Show: <br>";
-        var top5Button = document.createElement('input');
-        top5Button.type = 'radio';
-        top5Button.name = 'top5';
-        top5Button.id = 'show-top5';
-        top5Button.value = 'show-top5';
-        var label = document.createElement('label');
-        label.innerHTML = "Only Top 5&nbsp";
-        optionsDiv.appendChild(top5Button);
-        optionsDiv.appendChild(label);
-        optionsDiv.innerHTML += "<br>";
-
+        optionsDiv.innerHTML = "Focus On: <br>";
+        
         var everyoneButton = document.createElement('input');
         everyoneButton.type = 'radio';
-        everyoneButton.name = 'top5';
+        everyoneButton.name = 'pca-mode';
         everyoneButton.id = 'show-everyone';
         everyoneButton.value = "show-everyone";
-        label = document.createElement('label');
+        var label = document.createElement('label');
         label.innerHTML = "Everyone&nbsp&nbsp&nbsp";
         optionsDiv.appendChild(everyoneButton);
         optionsDiv.appendChild(label);
-        document.getElementById("show-top5").checked = true;
+        optionsDiv.innerHTML += "<br>";
         
-        document.getElementById('show-top5').onclick = function() {
-            showTop5 = true;
-            plotSimilarDrivers(data, data2);
-        }
+        var top5Button = document.createElement('input');
+        top5Button.type = 'radio';
+        top5Button.name = 'pca-mode';
+        top5Button.id = 'show-top5';
+        top5Button.value = 'show-top5';
+        label = document.createElement('label');
+        label.innerHTML = "Closest 5&nbsp";
+        optionsDiv.appendChild(top5Button);
+        optionsDiv.appendChild(label);
+        document.getElementById("show-everyone").checked = true;
+ 
         document.getElementById('show-everyone').onclick = function() {
-            showTop5 = false;
-            plotSimilarDrivers(data, data2);
+            PCAmode = 0;
+            plotPCA(data, data2);
         }
-       
+ 
+        document.getElementById('show-top5').onclick = function() {
+            PCAmode = 1;
+            plotPCA(data, data2);
+        }
+  
+        // Check if the python script has answered back
         if (PCAdata.length) {  
-            plotSimilarDrivers(data, data2);
+            plotPCA(data, data2);
         }
         else {
             labelAchievements.innerHTML = "PCA not available right now! The python script is offline!";
         }
     }
     
-    // Plots the layout that displays similar drivers to the one selected
-    function plotSimilarDrivers(data, data2) {
+    // Plots the layout that displays the PCA
+    function plotPCA(data, data2) {
         // Erase previous data
         simSvg.selectAll('*').remove();
         
