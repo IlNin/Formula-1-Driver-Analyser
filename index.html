@@ -67,9 +67,11 @@
     var maxYear; // Max year in which the driver has droven
     var constructors = []; // Keeps a list of constructors for which the driver has droven
     var constructorsDisabled = []; // List of constructors which the driver drove for that the user is not interested in
+    var lastConstructorEnabled = ""; // The last constructor that the user has enabled
     var teammates = []; // Keeps a list of the selected driver's teammates
     var teammatesDisabled = []; // List of teammates that the user is not interested in
     var teammatesShowing = []; // List of teammates that are actually showing on the chart
+    var lastTeammateEnabled = ""; // The last teammate that the user has enabled
 
     // Avg line parameters
     var barsClicked = []; // List of bars clicked in the total points chart
@@ -405,7 +407,11 @@
         flagAddCircuits = 0;
         constructors = [];
         constructorsDisabled = []; 
+        lastConstructorEnabled = "";
         teammates = [];
+        teammatesDisabled = []; 
+        teammatesShowing = []; 
+        lastTeammateEnabled = "";
         
         selectedTrackDNF = 0;
         minYearSelectedDNF = 0;
@@ -932,6 +938,7 @@
                 else {
                     var index = constructorsDisabled.indexOf(d);
                     constructorsDisabled.splice(index, 1);
+                    lastConstructorEnabled = d;
                     
                     // Restores the entry in the legend
                     d3.select(".rect"+d)
@@ -1293,6 +1300,14 @@
             }
         }  
 
+        // Refresh the list of filtered out teammates
+        teammatesDisabled = [];
+        for (i = 1; i < teammates.length; i++) {
+            if (!teammatesShowing.includes(teammates[i])) {
+                teammatesDisabled.push(teammates[i]);
+            }
+        }
+        
         // Draws the legend
         drawComparisonLegend(data, data2, teammates);
     }
@@ -1302,6 +1317,7 @@
         // Erase previous data
         svgCmpLegend.selectAll('*').remove();
         
+        // Resize the legend if there too many entries
         if (teammates.length > 15) {
             d3.select(".svgCmp").attr("height", teammates.length*sizeSquare*1.5);
         }
@@ -1354,6 +1370,7 @@
         legend
             .on("mouseover", function(d) {
                 // Highlights the entry in the legend and outlines the right bars
+                document.body.style.cursor = "pointer";
                 if (allDrivers.includes(d)) {
                     d3.select(".rect"+d)
                         .attr("stroke", "black");
@@ -1373,6 +1390,7 @@
             })
             .on("mouseout", function(d) {
                 // Restores everything
+                document.body.style.cursor = "default";
                 d3.select(".rect"+d)
                     .attr("stroke", "none");
                 d3.select(".text"+d)
@@ -1381,10 +1399,48 @@
                     .style("stroke", "white")
             })
             .on("click", function(d) {
-                if (allDrivers.includes(d)) {
-                    selectedDriver = d;
-                    initializeChartsLayout(data, data2);
+                if (!teammatesDisabled.includes(d)) {
+                    if (d == selectedDriver) {
+                        alert("Can't filter out the selected driver!");
+                        return;
+                    }
+                    if (teammatesDisabled.length == teammates.length-2) {
+                        alert("Can't filter out all teammates!");
+                        return;
+                    }
+                    teammatesDisabled.push(d);
+                    
+                    // Disables the entry in the constructor legend
+                    d3.select(".rect"+d)
+                        .style("fill", "grey");
+                    d3.select(".text"+d)
+                        .style("fill", "grey");
                 }
+                else {
+                    var index = teammatesDisabled.indexOf(d);
+                    teammatesDisabled.splice(index, 1);
+                    lastTeammateEnabled = d;
+                    
+                    // Restores the entry in the legend
+                    d3.select(".rect"+d)
+                        .style("fill", colorsTeammates(d));
+                    d3.select(".text"+d)
+                        .style("fill", "black");
+               }
+               var lastConstructorsDisabledSize = constructorsDisabled.length;
+               plotComparisons(data, data2);
+               if (constructorsDisabled.length != lastConstructorsDisabledSize) {
+                    plotPointsAchieved(data, data2);
+                    maxValueDNF = 0;
+                    minYearSelectedDNF = minYear;
+                    maxYearSelectedDNF = maxYear;
+                    minYearSelectedCons = minYear;
+                    maxYearSelectedCons = maxYear;
+                    drawDNFTimeSlider(data);
+                    plotDNF(data, minYearSelectedDNF, maxYearSelectedDNF, selectedTrackDNF);
+                    drawConsistencyTimeSlider(data);
+                    plotConsistency(data, minYearSelectedCons, maxYearSelectedCons, selectedTrackCons);
+               }
             });
     }
     
@@ -1594,10 +1650,10 @@
         
         // Adds the stats under the graph
         finishesRatio = (relevantDataDNF[1].value*100)/relevantDataDNF[0].value;
-        labelTotalRacesDNF.innerHTML = "Number of finishes: " + relevantDataDNF[1].value + " (" + finishesRatio.toFixed(2) + "% of the races)<br>";
+        labelTotalRacesDNF.innerHTML = "<b>Finishes</b>: " + relevantDataDNF[1].value + " (" + finishesRatio.toFixed(2) + "%)";
         sumDNF = sortedRelevantDataDNF[0].value + sortedRelevantDataDNF[1].value + sortedRelevantDataDNF[2].value;
         dnfRatio = (sumDNF*100)/relevantDataDNF[0].value;
-        labelTotalRacesDNF.innerHTML += "Number of DNFs: " +  sumDNF + " (" + dnfRatio.toFixed(2) + "% of the races)";
+        labelTotalRacesDNF.innerHTML += "&nbsp&nbsp&nbsp<b>DNFs</b>: " +  sumDNF + " (" + dnfRatio.toFixed(2) + "%)";
     }
     
     // Prepares the layout for the chart that displays the consistency of the placements
@@ -1701,6 +1757,9 @@
         
         // Finds the relevant data
         var relevantData = findPlacements(data, selectedMinYear, selectedMaxYear, selectedTrack);
+        var stats = relevantData.pop();
+        console.log(relevantData);
+        console.log(stats);
         
         // Adds data about circuits if not already done
         if (flagAddCircuits == 0) {
@@ -1855,19 +1914,24 @@
         // Refreshes the stats
         if (sortedRelevantResults.length >= 4) {
             if (q1 == min && q3 == max) {
-                labelTotalRacesCons.innerHTML = "100% of Placements: [" + q1 + ", " + q3 + "]<br>";
+                labelTotalRacesCons.innerHTML = "<b>Consistency</b>: 100% of placements between " + q1 + " and " + q3 + "<br>";
             }
             else if (q1 == min || q3 == max) {
-                labelTotalRacesCons.innerHTML = "75% of Placements: [" + q1 + ", " + q3 + "]<br>";
+                labelTotalRacesCons.innerHTML = "<b>Consistency</b>: 75% of placements between " + q1 + " and " + q3 + "<br>";
             }
             else {
-                labelTotalRacesCons.innerHTML = "50% of Placements: [" + q1 + ", " + q3 + "]<br>";
+                labelTotalRacesCons.innerHTML = "<b>Consistency</b>: 50% of placements between " + q1 + " and " + q3 + "<br>";
             }
         }
         else {
             labelTotalRacesCons.innerHTML = "Not enough data to draw a box-plot!<br>";
         }
-        labelTotalRacesCons.innerHTML += "Number of finishes: " + relevantData.length + "<br>";
+        var finishesRatio = (relevantData.length*100)/stats.starts;
+        var winsRatio = (stats.wins*100)/stats.starts;
+        var podiumsRatio = (stats.podiums*100)/stats.starts;
+        labelTotalRacesCons.innerHTML += "<b>Finishes</b>: " + relevantData.length + " (" + finishesRatio.toFixed(2) + "%)";
+        labelTotalRacesCons.innerHTML += "&nbsp&nbsp&nbsp<b>Wins</b>: " + stats.wins + " (" + winsRatio.toFixed(2) + "%)";
+        labelTotalRacesCons.innerHTML += "&nbsp&nbsp&nbsp<b>Podiums</b>: " + stats.podiums + " (" + podiumsRatio.toFixed(2) + "%)";
     }
     
     // Prepares the layout for the chart that displays similar drivers to the one selected
@@ -2401,12 +2465,23 @@
                     j = -1;
                 }
                 else if ((constructorResults[j].surname + "_" + constructorResults[j].name) != selectedDriver && findTeammates == true) {
+                    // Restore a constructor if the user has filtered in a driver which drove for a previously filtered out constructor
+                    if (lastTeammateEnabled == (constructorResults[j].surname + "_" + constructorResults[j].name)) {
+                        lastTeammateEnabled = "";
+                        var index = constructorsDisabled.indexOf(constructorResults[j].constructor);
+                        constructorsDisabled.splice(index, 1);
+                    }
+                    
+                    // The data is not of interest because the constructor is filtered out
                     if (constructorsDisabled.includes(constructorResults[j].constructor)) {
                         continue;
                     }
-                    /*if (teammatesDisabled.includes(constructorResults[j].surname + "_" + constructorResults[j].name)) {
+                    
+                    // The data is not of interest because the driver is filtered out
+                    if (teammatesDisabled.includes(constructorResults[j].surname + "_" + constructorResults[j].name) && lastConstructorEnabled != constructorResults[j].constructor) {
                         continue;
-                    } */
+                    }
+                        
                     newTuple = {
                         year: constructorResults[j].year,
                         round: constructorResults[j].round,
@@ -2423,6 +2498,7 @@
                 }
             }
         }
+        lastConstructorEnabled = "";
         
         // Transforms the data in the final form used by the chart
         relevantData = d3.nest()
@@ -2614,6 +2690,9 @@
         
         // Finds the results of the selected pilot between the chosen range of years, and keeps track of the circuits
         var relevantResults = [];
+        var starts = 0;
+        var wins = 0;
+        var podiums = 0;
         for (i = 0; i < groupedResults.length; i++) {
             var key = groupedResults[i].key;
             if (key == selectedDriver) {
@@ -2622,20 +2701,48 @@
                     if (!circuits.includes(values[j].circuit)) {
                         circuits.push(values[j].circuit);
                     }
-                    if (values[j].year >= minYear && values[j].year <= maxYear && (values[j].status == "Finished" || values[j].status.substring(0, 1) == "+")) {
-                        // Check if the current race was set in a circuit selected by the user
-                        if (index != 0 && circuits[index-1] != values[j].circuit) {
-                            continue;
+                    if (values[j].year >= minYear && values[j].year <= maxYear) {
+                        starts += 1;
+                        
+                        // Check if the driver reached the finish line
+                        if (values[j].status == "Finished" || values[j].status.substring(0, 1) == "+") {
+                        
+                            // Check if the current race was set in a circuit selected by the user
+                            if (index != 0 && circuits[index-1] != values[j].circuit) {
+                                starts -= 1;
+                                continue;
+                            }
+                            
+                            // Check if the driver was driving for a filtered out constructor
+                            if (constructorsDisabled.includes(values[j].constructor)) {
+                                starts -= 1;
+                                continue;
+                            }
+                            
+                            // Refresh wins/podiums counter
+                            if (parseInt(values[j].position) >= 1 && parseInt(values[j].position) <= 3) {
+                                podiums += 1;
+                                if (parseInt(values[j].position) == 1) {
+                                    wins += 1;
+                                }
+                            }
+                            relevantResults.push(parseInt(values[j].position));
                         }
-                        // Check if the driver was driving for a filtered out constructor
-                        if (constructorsDisabled.includes(values[j].constructor)) {
-                            continue;
+                        else {
+                            starts -= 1;
                         }
-                        relevantResults.push(parseInt(values[j].position));
                     }
                 }
             }
         }
+        
+        // Create a tuple with the stats
+        var newTuple = {
+            starts: starts,
+            wins: wins,
+            podiums: podiums
+        }
+        relevantResults.push(newTuple);
         
         /* DEBUG
         console.log(relevantResults); */
