@@ -2558,30 +2558,48 @@
     
     // Writes the right text on the upper right section of the application
     function writeOnAbout(index) {
+        // Change some attributes of the div
+        if (index >= 0 && index <= 2) {
+            about.style.paddingTop = "5px";
+            about.style.fontSize = "13px";
+            about.style.height = "71px";
+        }
+        else {
+            about.style.paddingTop = "2px";
+            about.style.fontSize = "12px";
+            about.style.height = "74px";
+        }
+        
         if (index == 0) {
             about.innerHTML = "<b>- ABOUT -</b><br>";
             about.innerHTML += "This VA application allows the user to find stats on Formula 1 drivers since 1994, so that they can gain a better knowledge of their skill and place in the sport.<br>";
             about.innerHTML += "<i>- Made by Luca Sannino as a project for Visual Analytics 2021 -</i>";
         }
         else if (index == 1) {
+            
             about.innerHTML = "<b>- POINTS PER SEASON -</b><br>";
-            about.innerHTML += "This bar chart shows the total points achieved by the selected driver per season. The user can also switch to the avg. points per race (per season) and interact with the bars by clicking them to calculate new averages on-the-fly.";
+            about.innerHTML += "This bar chart shows the points achieved by the selected driver per season.<br>"
+            about.innerHTML += "<b>Interactions</b>: Clicking on bars to calculate averages; Clicking on the legend to filter data about a constructor.";
         }
         else if (index == 2) {
             about.innerHTML = "<b>- WINS/LOSSES AGAINST TEAMMATES -</b><br>";
-            about.innerHTML += "This bar chart shows how many times the selected driver has placed better than their teammates across the seasons. The user can also switch between race and qualifying results and interact with the legend to select a new driver.";
+            about.innerHTML += "This bar chart shows how many times the selected driver has placed better than their teammates across the seasons, both in races and qualifying.<br>";
+            about.innerHTML += "<b>Interactions</b>: Clicking on the legend to filter data about a teammate.";
         }
         else if (index == 3) {
             about.innerHTML = "<b>- DNFs' CAUSES -</b><br>";
-            about.innerHTML += "This lollipop chart shows the causes of DNFs. 'Physical' includes cases of external damage to the car (tyre punctures, broken wings etc.), while 'Mechanical' includes damage to the internal components (power loss, engine on fire etc.)."; 
+            about.innerHTML += "This lollipop chart shows the causes of DNFs. '<b>Damage</b>' includes cases of external damage to the car (tyre punctures, broken wings etc.), while '<b>Reliability</b>' includes issues to the internal components (power loss, engine on fire etc.).<br>"; 
+            about.innerHTML += "<b>Interactions</b>: Using the time slider and selecting circuits to focus on a part of the data."
         }
         else if (index == 4) {
             about.innerHTML = "<b>- PLACEMENTS' CONSISTENCY ON FINISHES -</b><br>";
-            about.innerHTML += "This box-plot chart shows the distribution of the placements upon finishes. A quartile of the distribution falls in each of the four sections, meaning that the gray box represents ~50% of the placements.";
+            about.innerHTML += "This box-plot chart shows the distribution of the placements upon finishes. A quartile of the distribution falls in each of the four sections, meaning that the gray box represents ~50% of the placements.<br>";
+            about.innerHTML += "<b>Interactions</b>: Using the time slider and selecting circuits to focus on a part of the data."
         }
         else if (index == 5) {
-            about.innerHTML = "<b>- TOP 5 DRIVERS WITH SIMILAR ACHIEVEMENTS -</b><br>";
-            about.innerHTML += "This scatter plot chart shows the five most similar drivers to the one selected in terms of career achievements. The closeness of the points was calculated using PCA on multidimensional data. Users can click on the drivers to see their stats.";
+            about.innerHTML = "<b>- PLACE IN THE SPORT'S HISTORY -</b><br>";
+            about.innerHTML += "This scatter plot chart shows the placement of the selected driver in terms of career achievements, alongside other drivers since 1994. The closeness of the points was calculated using PCA on multidimensional data.<br>";
+            about.innerHTML += "<b>Interactions</b>: Clicking on the legend to filter data about a driver."
         }
     }
           
