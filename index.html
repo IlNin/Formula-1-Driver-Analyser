@@ -74,6 +74,7 @@
     var teammatesShowing = []; // List of teammates that are actually showing on the chart
     var lastTeammateEnabled = ""; // The last teammate that the user has enabled
     var notableDrivers = []; // List of drivers that are featured in the PCA
+    var driversDisabled = []; // List of drivers that are disabled in the top 5/10 of the PCA
 
     // Avg line parameters
     var barsClicked = []; // List of bars clicked in the total points chart
@@ -414,6 +415,7 @@
         teammatesDisabled = []; 
         teammatesShowing = []; 
         lastTeammateEnabled = "";
+        driversDisabled = [];
         
         selectedTrackDNF = 0;
         minYearSelectedDNF = 0;
@@ -2115,7 +2117,7 @@
                 if (!chosenIndexes.includes(index)) {
                     notableDrivers.push(PCAdata[index].driver);
                     chosenIndexes.push(index);
-                    if (!teammatesDisabled.includes(PCAdata[index].driver)) {
+                    if (!teammatesDisabled.includes(PCAdata[index].driver) && !driversDisabled.includes(PCAdata[index].driver)) {
                         relevantData.push(PCAdata[index]);
                     }     
                 } 
@@ -2135,7 +2137,7 @@
         }   
         else {
             for (i = 0; i < PCAdata.length; i++) {
-                if (PCAdata[i].driver != selectedDriver && !teammatesDisabled.includes(PCAdata[i].driver)) {
+                if (PCAdata[i].driver != selectedDriver && !teammatesDisabled.includes(PCAdata[i].driver) && !driversDisabled.includes(PCAdata[i].driver)) {
                     relevantData.push(PCAdata[i]);
                 }
             }
@@ -2304,7 +2306,7 @@
                 if (d == "Other") {
                     return "orange";
                 }
-                if (teammatesDisabled.includes(d)) {
+                if (teammatesDisabled.includes(d) || driversDisabled.includes(d)) {
                     return "grey";
                 }
                 return colorsTeammates(d);
@@ -2320,7 +2322,7 @@
             .attr("dy", ".35em")
             .style("font", "12px times")
             .style("fill", function(d) {
-                if (teammatesDisabled.includes(d)) {
+                if (teammatesDisabled.includes(d) || driversDisabled.includes(d)) {
                     return "grey";
                 }
                 return "black";
@@ -2332,6 +2334,7 @@
         // Add input events to the legend
         legend
             .on("mouseover", function(d) {
+                document.body.style.cursor = "pointer";
                 // Highlights the entry in the legend and outlines the right bars
                 if (d == "Other") {
                     return;
@@ -2366,6 +2369,7 @@
                 }
             })
             .on("mouseout", function(d) {
+                document.body.style.cursor = "default";
                 // Restores everything
                 d3.selectAll(".rect"+d)
                     .attr("stroke", "none");
@@ -2382,9 +2386,78 @@
                     .style("stroke", "white");
             })
             .on("click", function(d) {
-                if (allDrivers.includes(d)) {
-                    selectedDriver = d;
-                    initializeChartsLayout(data, data2);
+                if (d == "Other") {
+                        alert("Can't disable all points in the PCA!");
+                        return;
+                }
+                else if (!teammatesDisabled.includes(d) && teammates.includes(d)) {
+                    if (d == selectedDriver) {
+                        alert("Can't filter out the selected driver!");
+                        return;
+                    }
+                    if (teammatesDisabled.length == teammates.length-2) {
+                        alert("Can't filter out all teammates!");
+                        return;
+                    }
+                    
+                    teammatesDisabled.push(d);
+                    
+                    // Disables the entry in the constructor legend
+                    d3.selectAll(".rect"+d)
+                        .style("fill", "grey");
+                    d3.selectAll(".text"+d)
+                        .style("fill", "grey");
+                }
+                else if (teammates.includes(d)) {
+                    var index = teammatesDisabled.indexOf(d);
+                    teammatesDisabled.splice(index, 1);
+                    lastTeammateEnabled = d;
+                    
+                    // Restores the entry in the legend
+                    d3.selectAll(".rect"+d)
+                        .style("fill", colorsTeammates(d));
+                    d3.selectAll(".text"+d)
+                        .style("fill", "black");
+                }
+                else if (!driversDisabled.includes(d)) {
+                    driversDisabled.push(d);
+                    
+                    // Disables the entry in the constructor legend
+                    d3.selectAll(".rect"+d)
+                        .style("fill", "grey");
+                    d3.selectAll(".text"+d)
+                        .style("fill", "grey");
+                }
+                else {
+                    var index = driversDisabled.indexOf(d);
+                    driversDisabled.splice(index, 1);
+                    
+                    // Restores the entry in the legend
+                    d3.selectAll(".rect"+d)
+                        .style("fill", colorsTeammates(d));
+                    d3.selectAll(".text"+d)
+                        .style("fill", "black");
+                }
+ 
+                if (teammates.includes(d)) {
+                    var lastConstructorsDisabledSize = constructorsDisabled.length;
+                    plotComparisons(data, data2);
+                    plotPCA(data, data2);
+                    if (constructorsDisabled.length != lastConstructorsDisabledSize) {
+                        plotPointsAchieved(data, data2);
+                        maxValueDNF = 0;
+                        minYearSelectedDNF = minYear;
+                        maxYearSelectedDNF = maxYear;
+                        minYearSelectedCons = minYear;
+                        maxYearSelectedCons = maxYear;
+                        drawDNFTimeSlider(data);
+                        plotDNF(data, minYearSelectedDNF, maxYearSelectedDNF, selectedTrackDNF);
+                        drawConsistencyTimeSlider(data);
+                        plotConsistency(data, minYearSelectedCons, maxYearSelectedCons, selectedTrackCons);
+                    }
+                }
+                else {
+                    plotPCA(data, data2);
                 }
             });
     }
