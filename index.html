@@ -11,15 +11,16 @@
 	</head>
     
     <body>
+    <div id="dialog" title="Basic dialog"></div>
     <script charset="utf-8">  
     // Dimensions
     var margins = {top: 20, right: 10, bottom: 40, left: 45};
-    var container_dimensions = {width: 550, height: 240}; 
+    var container_dimensions = {width: 551, height: 240}; 
     var chart_dimensions = {
         width: container_dimensions.width - margins.left - margins.right,
         height: container_dimensions.height - margins.top - margins.bottom
     };
-    var small_container_dimensions = {width: 445, height: 210};
+    var small_container_dimensions = {width: 446, height: 210};
     var small_chart_dimensions = {
         width: small_container_dimensions.width - margins.left - (margins.right + 30),
         height: small_container_dimensions.height - margins.top - margins.bottom
@@ -37,6 +38,10 @@
     var consTimeSliderSvg, consSvg, labelTotalRacesCons;
     var simSvg, svgSimLegend, labelAchievements;
     
+    // Colors
+    var colors = d3.scaleOrdinal(d3.schemeCategory20);
+    var colorsTeammates = d3.scaleOrdinal(d3.schemeCategory20);
+    
     // User inputs
     var showTotalPoints = true; // Flag that indicates to show the total points instead of the average per race
     var showWinsInRaces = true; // Flag that indicates to show the wins in races instead of qualifying
@@ -49,24 +54,41 @@
     var minYearSelectedCons = 0;
     var maxYearSelectedCons = 0;
     
+    var PCAmode = 0; // 0: Show Everyone; 1: Show Top 5
+    
     // Drivers data
     var allDrivers = []; // List of drivers loaded by the data
     var drivers = []; // List of drivers for the selection, which depends on the years selected by the user
     var achievements = []; // List of tuples that contain the achievements for each driver
     var PCAdata = []; // List of the PCA components for each driver
     var circuits = []; // List of tracks where the selected driver has driven
-    var flagAddCircuits = 0;
-    var selectedDriver = "";
-    var minYear;
-    var maxYear;
+    var flagAddCircuits = 0; // Flag that specify if the list of circuits needs to be added to the DNF/Consistency chart
+    var selectedDriver = ""; // Name of the current selected driver
+    var minYear; // Min year in which the driver has droven
+    var maxYear; // Max year in which the driver has droven
+    var constructors = []; // Keeps a list of constructors for which the driver has droven
+    var constructorsDisabled = []; // List of constructors which the driver drove for that the user is not interested in
+    var lastConstructorEnabled = ""; // The last constructor that the user has enabled
+    var teammates = []; // Keeps a list of the selected driver's teammates
+    var teammatesDisabled = []; // List of teammates that the user is not interested in
+    var teammatesShowing = []; // List of teammates that are actually showing on the chart
+    var lastTeammateEnabled = ""; // The last teammate that the user has enabled
+    var notableDrivers = []; // List of drivers that are featured in the PCA
+    var driversDisabled = []; // List of drivers that are disabled in the top 5/10 of the PCA
+    
+    var driversHovered = [];
 
     // Avg line parameters
     var barsClicked = []; // List of bars clicked in the total points chart
     var nBarsClicked = 0;
     var cumulativePoints = 0;
     
+    // DNF parameters
+    var maxValueDNF = 0; // The max value of the x scale for the DNF chart
+    
     // DEBUG
     var showTitleImage = 1;
+    var animationsSpeed = 1; // 1: No animations, 1000: default
     
     // Draws the title screen above the charts
     function drawTitle() {
@@ -83,7 +105,7 @@
         title.id = "title";
         if (showTitleImage) {
             var image = document.createElement("img");
-            image.setAttribute("src", "Logo3.png");
+            image.setAttribute("src", "Logo3B.png");
             image.setAttribute("height", "76px");
             image.setAttribute("width", "445px");
             title.appendChild(image);
@@ -155,6 +177,7 @@
                     data.forEach(function(d) { // Cycles through the data
                         d.surname = d.surname.replace(/[\s.']/g, '_'); // Removes eventual spaces in the surnames
                         d.name = d.name.replace(/[\s.']/g, '_'); // Removes eventual spaces in the names
+                        d.constructor = d.constructor.replace(/[\s.']/g, '_');
                         var driver = d.surname + "_" + d.name;
                         if (d.year >= 1994 && d.year <= 2020 && !drivers.includes(driver)) {
                             drivers.push(driver);
@@ -165,6 +188,7 @@
                     data2.forEach(function(d) { // Cycles through the qualifying data
                         d.surname = d.surname.replace(/[\s.']/g, '_'); // Removes eventual spaces in the surnames
                         d.name = d.name.replace(/[\s.']/g, '_'); // Removes eventual spaces in the names
+                        d.constructor = d.constructor.replace(/[\s.']/g, '_');
                     });
                     
                     data3.forEach(function(d) { 
@@ -201,13 +225,23 @@
             var years = []; // Years where the championship was won
             var points = 0;
             var wins = 0;
+            var podiums = 0;
             var poles = 0;
+            var starts = 0;
+            var finishes = 0;
             
             data.forEach(function(d) {
                 if (driver == d.surname + "_" + d.name) {
+                    starts += 1;
                     points += parseInt(d.points);
-                    if (d.position == 1) {
-                        wins += 1;
+                    if (d.position >= 1 && d.position <= 3) {
+                        podiums += 1;
+                        if (d.position == 1) {
+                            wins += 1;
+                        }
+                    }
+                    if (d.status == "Finished" || d.status.substring(0, 1) == "+") {
+                        finishes += 1;
                     }
                 }
             });
@@ -244,7 +278,10 @@
                 years: years,
                 points: points,
                 wins: wins,
-                poles: poles
+                podiums: podiums,
+                poles: poles,
+                starts: starts,
+                finishes: finishes
             }
             achievements.push(newTuple);
         }     
@@ -258,7 +295,7 @@
                 'Access-Control-Allow-Origin':'*'
             }, */
             type: 'POST',
-            url: "https://formula-1-driver-analyser-pca.herokuapp.com/pca",
+            url: "http://127.0.0.1:5000/pca",
             data: JSON.stringify({value: achievements}),
             crossDomain: true,
             success: function (response) {
@@ -371,8 +408,19 @@
         // Restores global variables
         showTotalPoints = true;
         showWinsInRaces = true;
+        PCAmode = 0;
         circuits = [];
         flagAddCircuits = 0;
+        constructors = [];
+        constructorsDisabled = []; 
+        lastConstructorEnabled = "";
+        teammates = [];
+        teammatesDisabled = []; 
+        teammatesShowing = []; 
+        lastTeammateEnabled = "";
+        driversDisabled = [];
+        
+        driversHovered = [];
         
         selectedTrackDNF = 0;
         minYearSelectedDNF = 0;
@@ -381,6 +429,11 @@
         selectedTrackCons = 0;
         minYearSelectedCons = 0;
         maxYearSelectedCons = 0;
+        
+        maxValueDNF = 0;
+        
+        colors = d3.scaleOrdinal(d3.schemeCategory20);
+        colorsTeammates = d3.scaleOrdinal(d3.schemeCategory20);
         
         // Appends the div with the name and stats of the driver selected
         var points;
@@ -391,7 +444,10 @@
         for (i = 0; i < achievements.length; i++) {
             if (achievements[i].driver == selectedDriver) {
                 points = achievements[i].points;
+                starts = achievements[i].starts;
+                finishes = achievements[i].finishes;
                 wins = achievements[i].wins;
+                podiums = achievements[i].podiums;
                 poles = achievements[i].poles;
                 championships = achievements[i].championships;
                 years = achievements[i].years;
@@ -400,7 +456,7 @@
         var driverSelectedDiv = document.createElement('div');
         driverSelectedDiv.id = "selecteddriver";
         driverSelectedDiv.innerHTML = "<b>- " + selectedDriver.replace(/_/g, ' ') + " -</b><br>";
-        driverSelectedDiv.innerHTML += "<i>Points: </i>" + points + " - <i>Wins: </i>" + wins + " - <i>Poles: </i>" + poles + " - <i>Championships: </i>" + championships;
+        driverSelectedDiv.innerHTML += "<b><i>Points: </i></b>" + points + " --- <b><i>Starts: </i></b>" + starts + " --- <b><i>Finishes: </i></b>" + finishes + " --- <b><i>Podiums: </i></b>" + podiums + " --- <b><i>Wins: </i></b>" + wins + " --- <b><i>Poles: </i></b>" + poles + " --- <b><i>Championships: </i></b>" + championships;
         if (years.length > 0) {
             driverSelectedDiv.innerHTML += " [";
             for (i = 0; i < years.length-1; i++) {
@@ -420,7 +476,7 @@
         document.body.append(wrapper);
         
         // Prepares all the layouts in the middle wrapper
-        preparePointsAchieved(data);    
+        preparePointsAchieved(data, data2);    
         prepareComparisons(data, data2);
         
         // Initializes the bottom wrapper
@@ -432,7 +488,7 @@
         // Prepares all the layouts in the bottom wrapper
         prepareDNF(data);
         prepareConsistency(data);
-        prepareSimilarDrivers(data, data2);
+        preparePCA(data, data2);
         
         // Appends the yellow ending div
         var endingDiv = document.createElement('div');
@@ -452,7 +508,7 @@
     }
     
     // Prepares the layout for the points achieved chart
-    function preparePointsAchieved(data) { 
+    function preparePointsAchieved(data, data2) { 
         // Initializes the div that contains the svg area for the points bars    
         var svgDiv = document.createElement('div');
         svgDiv.id = "bargraph";
@@ -475,6 +531,7 @@
         // Adds radios button in order to switch between total points and average points per race
         var optionsDiv = document.createElement('div');
         svgDiv.appendChild(optionsDiv);
+        optionsDiv.style.fontSize = "14px";
         optionsDiv.innerHTML = "Show: ";
         var totalButton = document.createElement('input');
         totalButton.type = 'radio';
@@ -509,7 +566,7 @@
       
         // Initializes the div for the points bar graph legend
         svgLegendDiv = document.createElement('div');
-        svgLegendDiv.innerHTML = "Legend Table<br>";
+        svgLegendDiv.innerHTML = "Constructors<br>";
         svgLegendDiv.id = "legendtable";
         svgLegendDiv.onmouseover = function() {
             writeOnAbout(1);
@@ -527,11 +584,11 @@
                     .attr("id","legendtable");
         
         // Plots the bar graph that shows the points achieved by the driver season by season
-        plotPointsAchieved(data);
+        plotPointsAchieved(data, data2);
     }
           
     // Plot a bar graph that shows the points achieved by the driver season by season
-    function plotPointsAchieved(data) {
+    function plotPointsAchieved(data, data2) {
         // Erase previous data
         barSvg.selectAll('*').remove();
         barsClicked = []; 
@@ -569,9 +626,6 @@
             .domain([maxPoints, 0])
             .range([0, chart_dimensions.height]);
         
-        // Initializes the colors
-        colors = d3.scaleOrdinal(d3.schemeCategory20);
-        
         // Initializes the axis
         xAxis = d3.axisBottom(x).ticks().tickFormat(d3.format("d"));
         yAxis = d3.axisLeft(y).ticks().tickFormat(d3.format("d"));
@@ -608,17 +662,17 @@
             });
        
         // Draws the bars
-        constructors = []; // Keeps a list of constructors for the legend
         for (i = 0; i < relevantData.length; i++) { // Cycles through the years
             year = relevantData[i].key;
             for (j = 0; j < relevantData[i].values.length; j++) { // Cycles through the constructors per year
                 constructor = relevantData[i].values[j].key;
                 
-                // Behind the scenes stuff
-                if (!constructors.includes(constructor) && relevantData[i].values[j].value.totalPoints > 0) { // Filters out constructors with zero points
+                // Adds constructor to the the list
+                if (!constructors.includes(constructor)) { 
                     constructors.push(constructor);
                 } 
-                if (j > 0) { // Check if there's a bar below (aka a constructor change in the season) and if so, it takes its measures
+                // Check if there's a bar below (aka a constructor change in the season) and if so, it takes its measures
+                if (j > 0) { 
                     barBelowY = relevantData[i].values[j-1].value.totalPoints;
                 }
                 
@@ -628,6 +682,9 @@
                     .enter()
                     .append("rect")
                         .attr("class", constructor + year)
+                        .attr("id", function(d) {
+                            return d.totalPoints;
+                        })
                         .style("fill", function(d) {
                             return colors(constructor);
                         })
@@ -638,7 +695,7 @@
                                 return 1;
                             }
                         })
-                        .attr("stroke-width", 3)
+                        .attr("stroke-width", 1)
                         .attr("x", x(year)) 
                         .attr("width", x.bandwidth)
                         .attr("y", y(0))
@@ -647,7 +704,7 @@
                 // Handles the animations
                 drawInvisibleBar = true; // Flag that indicates to draw an invisible bar in case there are no points (so that labels can still appear)
                 bar.transition()
-                    .duration(2000)
+                    .duration(animationsSpeed)
                     .attr("y", function(d) { 
                         if (j > 0) { // If there's a bar below, stack the new bar above it
                             return y(d.totalPoints + barBelowY);
@@ -676,6 +733,7 @@
                 
                 // Handles inputs                 
                 bar.on("mouseover", function(d) {  
+                    document.body.style.cursor = "pointer";
                     if (nBarsClicked == 0) {
                         d3.select(this)
                             .style("stroke", "black");
@@ -690,6 +748,7 @@
                 });
                    
                 bar.on("mouseout", function(d) {      
+                    document.body.style.cursor = "default";
                     if (nBarsClicked == 0) {
                         d3.select(this)
                             .style("stroke", "none");
@@ -700,6 +759,10 @@
                 });
                 
                 bar.on("click", function(d) {
+                    if (d.totalPoints == 0) {
+                        return;
+                    }
+                    
                     // Selects the bar clicked, and also the other bars in the same year
                     year = d3.select(this).attr("class").substring(classLength-4, classLength);
                     selection = d3.selectAll("[class$='" + year + "']");
@@ -726,16 +789,8 @@
                                 barsClicked.splice(index, 1);
                                 return "none";
                             }
-                        })
-                        .style("opacity", function(d) {
-                            if (d3.select(this).style("opacity") == 0) {
-                                return 0.1;
-                            }
-                            else if (d3.select(this).style("opacity") == 0.1) {
-                                return 0;
-                            }
-                       });
-                    
+                        });
+                        
                     // Calculates the total number of points to add/remove to the cumulative points across the seasons
                     points = selection.data();
                     if (add) {
@@ -782,13 +837,18 @@
         }
         
         // Draws the legend for the graph
-        drawPointsAchievedLegend(constructors);      
+        drawPointsAchievedLegend(data, data2);      
     }
         
     // Draws the legend for the points bar graph
-    function drawPointsAchievedLegend(constructors) {
+    function drawPointsAchievedLegend(data, data2) {
         // Erase previous data
         svgLegend.selectAll('*').remove();
+        
+        svgLegend.append("text")
+            .style("font", "12px times")
+            .attr("y", 5)
+            .text("Click to filter data!");
         
         // Prepares the space/layout for the legend
         sizeSquare = 10;
@@ -798,7 +858,7 @@
             .append("g")
             .attr("class", "legend")
 			.attr("transform", function(d,i){
-                return "translate(0,"+(i*sizeSquare+i*10)+")";
+                return "translate(0,"+((i+1)*sizeSquare+i*5)+")";
             });
         
         // Draws the small colored rectangles
@@ -809,7 +869,10 @@
                 return "rect"+d;
             })
 			.style("fill", function(d){
-                return colors(d);
+                if (!constructorsDisabled.includes(d)) {
+                    return colors(d);
+                }
+                    return "grey";
 			});
             
         // Writes the text near the small colored rectangles
@@ -818,27 +881,51 @@
                 return "text"+d;
             })
             .attr("x", sizeSquare+5)
-            .attr("y", sizeSquare/2)
+            .attr("y", (sizeSquare/2))
             .attr("dy", ".35em")
+            .style("font", "12px times")
+            .style("fill", function(d) {
+                if (!constructorsDisabled.includes(d)) {
+                    return "black";
+                }
+                return "grey";
+            })
             .text(function(d) {
                 return d.replace(/_/g, ' ');
             });
+        
+         
             
         // Add input events to the legend
         legend
             .on("mouseover", function(d) {
-                // Highlights the entry in the legend and outlines the right bars
+                // Highlights the entry in the legend and outlines the right bars, both in the points and teammates charts
+                document.body.style.cursor = "pointer";
                 d3.select(".rect"+d)
                     .attr("stroke", "black");
                 d3.select(".text"+d)
                     .attr("text-decoration", "underline overline");
                 if (nBarsClicked == 0) {
                     barSvg.selectAll("[class*=" + d + "]")
-                        .style("stroke", "black");        
+                        .style("stroke", "black"); 
+                    cmpSvg.selectAll("[class^=rect]")
+                        .style("stroke", function() {
+                            if (d3.select(this).attr("id") == d) {
+                                hoveredDriver = d3.select(this).attr("class").substring(10, d3.select(this).attr("class").length);
+                                if (!driversHovered.includes(hoveredDriver)) {
+                                    driversHovered.push(hoveredDriver);
+                                }
+                                console.log(driversHovered);
+                                return "black";
+                            }
+                            
+                            return d3.select(this).style("stroke");
+                        }); 
                 }
             })
             .on("mouseout", function(d) {
                 // Restores everything
+                document.body.style.cursor = "default";
                 d3.select(".rect"+d)
                     .attr("stroke", "none");
                 d3.select(".text"+d)
@@ -846,8 +933,57 @@
                 if (nBarsClicked == 0) {
                     barSvg.selectAll("[class*=" + d + "]")
                         .style("stroke", "none"); 
+                    cmpSvg.selectAll("[class^=rect]")
+                        .style("stroke", "white");
                 }
-            });
+                driversHovered = [];
+            })
+            .on("click", function(d) {
+                // Hides the data regarding that constructor in all the charts
+                if (!constructorsDisabled.includes(d)) {
+                    if (constructorsDisabled.length == constructors.length-1) {
+                        alert("Can't remove all constructors!");
+                        return;
+                    }
+                    if ((driversHovered.length + teammatesDisabled.length) == teammates.length-1) {
+                        alert("Removing this constructor may remove all teammates!");
+                        return;
+                    }
+                    constructorsDisabled.push(d);
+                    
+                    // Disables the entry in the constructor legend
+                    d3.select(".rect"+d)
+                        .style("fill", "grey");
+                    d3.select(".text"+d)
+                        .style("fill", "grey");  
+                }
+                // Restores the data regarding that constructor in all the charts
+                else {
+                    var index = constructorsDisabled.indexOf(d);
+                    constructorsDisabled.splice(index, 1);
+                    lastConstructorEnabled = d;
+                    
+                    // Restores the entry in the legend
+                    d3.select(".rect"+d)
+                        .style("fill", colors(d));
+                    d3.select(".text"+d)
+                        .style("fill", "black");
+                }
+                
+                // Refresh the data in the charts
+                plotPointsAchieved(data, data2);
+                plotComparisons(data, data2);
+                maxValueDNF = 0;
+                minYearSelectedDNF = minYear;
+                maxYearSelectedDNF = maxYear;
+                minYearSelectedCons = minYear;
+                maxYearSelectedCons = maxYear;
+                drawDNFTimeSlider(data);
+                plotDNF(data, minYearSelectedDNF, maxYearSelectedDNF, selectedTrackDNF);
+                drawConsistencyTimeSlider(data);
+                plotConsistency(data, minYearSelectedCons, maxYearSelectedCons, selectedTrackCons);
+                plotPCA(data, data2);
+            });          
     }
     
     // Prepares the layout for the comparisons with teammates chart
@@ -874,6 +1010,7 @@
         // Adds radios button in order to switch between total points and average points per race
         optionsDiv = document.createElement('div');
         svgCmpDiv.appendChild(optionsDiv);
+        optionsDiv.style.fontSize = "14px";
         optionsDiv.innerHTML = "Show: ";
         winsRacesButton = document.createElement('input');
         winsRacesButton.type = 'radio';
@@ -908,7 +1045,7 @@
         
         // Initializes the div for the points bar graph legend
         svgCmpLegendDiv = document.createElement('div');
-        svgCmpLegendDiv.innerHTML = "Legend Table<br>";
+        svgCmpLegendDiv.innerHTML = "Drivers<br>";
         svgCmpLegendDiv.id = "cmplegendtable";
         svgCmpLegendDiv.onmouseover = function() {
             writeOnAbout(2);
@@ -920,6 +1057,7 @@
             .append('svg')
                 .attr("width", legend_width)
                 .attr("height", container_dimensions.height)
+                .attr("class", "svgCmp")
                 // .style("background-color", "red")
                 .append("g")
                     .attr("transform", "translate(" + 0 + "," + margins.top/4 + ")")
@@ -944,8 +1082,6 @@
         }
         
         // Initializes the x scale and finds the range of seasons
-        minYear = relevantData[0].key.substring(0, 4);
-        maxYear = relevantData[relevantData.length-1].key.substring(0, 4);
         x = d3.scaleBand()
             .domain(relevantData.map(function(d) {
                 return d.key.substring(0, 4);
@@ -984,10 +1120,7 @@
         yBottom = d3.scaleLinear()
             .domain([0, maxWins])
             .range([0, chart_dimensions.height/2]);
-        
-        // Initializes the colors
-        colorsTeammates = d3.scaleOrdinal(d3.schemeCategory20);
-        
+            
         // Initializes the axis
         xAxis = d3.axisBottom(x).ticks().tickFormat(d3.format("d"));
         yTopAxis = d3.axisLeft(yTop).ticks(4).tickFormat(d3.format("d"));
@@ -1047,8 +1180,11 @@
             });
         
         // Plot the data
-        teammates = []; // Contains the list of drivers involved in the comparison
-        teammates.push(selectedDriver);
+        if (!teammates.includes(selectedDriver)) {
+            teammates.push(selectedDriver);
+        }
+        teammatesShowing = [];
+        teammatesShowing.push(selectedDriver);
         previousYear = 0; // Previous year found while cycling through the data
         barBelowTopY = 0; // Size of the bar on the top Y if there's one below the current one
         barAboveBottomY = 0; // Size of the bar on the bottom Y if there's one above the current one
@@ -1068,8 +1204,11 @@
             
             // Refresh the list of teammates
             teammate = relevantData[i].key.substring(5, relevantData[i].key.length);
-            if (!teammates.includes(teammate) && relevantData[i].value.teammateWins > 0) {
+            if (!teammates.includes(teammate)) {
                 teammates.push(teammate);
+            }
+            if (!teammatesShowing.includes(teammate)) {
+                teammatesShowing.push(teammate);
             }
             
             // Plot selected driver and teammate
@@ -1078,6 +1217,9 @@
                     .data([relevantData[i].value]) // The [ ] parenthesis turn the object in an array
                     .enter()
                     .append("rect")
+                        .attr("id", function(d) {
+                            return d.constructor;
+                        })
                         .attr("class", function(d) {
                             if (j == 0) { // Index 0 means this is the selected driver
                                 return "rect0" + relevantData[i].key;
@@ -1103,7 +1245,7 @@
                 
                 // Handles animation
                 bar.transition()
-                    .duration(2000)
+                    .duration(animationsSpeed)
                     .attr("y", function(d) {
                         if (j == 0) {
                             return yTop(d.selectedDriverWins + barBelowTopY);
@@ -1162,6 +1304,14 @@
             }
         }  
 
+        // Refresh the list of filtered out teammates
+        teammatesDisabled = [];
+        for (i = 1; i < teammates.length; i++) {
+            if (!teammatesShowing.includes(teammates[i])) {
+                teammatesDisabled.push(teammates[i]);
+            }
+        }
+        
         // Draws the legend
         drawComparisonLegend(data, data2, teammates);
     }
@@ -1171,6 +1321,16 @@
         // Erase previous data
         svgCmpLegend.selectAll('*').remove();
         
+        svgCmpLegend.append("text")
+            .style("font", "12px times")
+            .attr("y", 5)
+            .text("Click to filter data!");
+        
+        // Resize the legend if there too many entries
+        if (teammates.length > 15) {
+            d3.select(".svgCmp").attr("height", (teammates.length*sizeSquare*1.5)+10);
+        }
+        
         // Prepares the space/layout for the legend
         sizeSquare = 10;
         legend = svgCmpLegend.selectAll("legend")
@@ -1179,7 +1339,7 @@
             .append("g")
             .attr("class", "legend")
 			.attr("transform", function(d,i){
-                return "translate(0,"+(i*sizeSquare+i*5)+")";
+                return "translate(0,"+((i+1)*sizeSquare+i*5)+")";
             });
         
         // Draws the small colored rectangles
@@ -1190,7 +1350,10 @@
                 return "rect"+d;
             })
 			.style("fill", function(d){
-                return colorsTeammates(d);
+                if (!teammatesDisabled.includes(d)) {
+                    return colorsTeammates(d);
+                }
+                return "grey";
 			});
             
         // Writes the text near the small colored rectangles
@@ -1202,6 +1365,12 @@
             .attr("y", sizeSquare/2)
             .attr("dy", ".35em")
             .style("font", "12px times")
+            .style("fill", function(d) {
+                if (!teammatesDisabled.includes(d)) {
+                    return "black";
+                }
+                return "grey";
+            })
             .text(function(d) {
                 return d.replace(/_/g, ' ');
             });
@@ -1210,35 +1379,104 @@
         legend
             .on("mouseover", function(d) {
                 // Highlights the entry in the legend and outlines the right bars
-                if (allDrivers.includes(d)) {
-                    d3.select(".rect"+d)
-                        .attr("stroke", "black");
-                    d3.select(".text"+d)
-                        .attr("text-decoration", "underline overline");    
-                }
+                document.body.style.cursor = "pointer";
+                d3.selectAll(".rect"+d)
+                    .attr("stroke", "black");
+                d3.selectAll(".text"+d)
+                    .attr("text-decoration", "underline overline");    
+
                 if (d == selectedDriver) {
                     cmpSvg.selectAll("[class^=rect0]")
                         .style("stroke", "black");
                 }
                 else {
+                    cmpSvg.selectAll("[class^=rect0][class$=" + d + "]")
+                        .style("stroke", "black");
                     cmpSvg.selectAll("[class^=rect1][class$=" + d + "]")
                         .style("stroke", "black");
                 }
+                
+                // Highlights the right point in the PCA chart
+                if (!allDrivers.includes(d)) {
+                    return;
+                }
+                simSvg.select("."+d)
+                        .attr("r", 8);
+                currentDriverAchievements = [];
+                for (i = 0; i < achievements.length; i++) {
+                    if (achievements[i].driver == d) {
+                        currentDriverAchievements = achievements[i];
+                    }
+                }
+                labelAchievements.innerHTML = "<b>"+d.replace(/_/g, ' ')+"</b><br>";
+                labelAchievements.innerHTML += "Points: " + currentDriverAchievements.points + " - Starts: " + currentDriverAchievements.starts + " - Finishes: " + currentDriverAchievements.finishes + " - Podiums: " + currentDriverAchievements.podiums + "<br>";
+                labelAchievements.innerHTML += "Wins: " + currentDriverAchievements.wins + " - Poles: " + currentDriverAchievements.poles + " - Championships " + currentDriverAchievements.championships;
             })
             .on("mouseout", function(d) {
                 // Restores everything
-                d3.select(".rect"+d)
+                document.body.style.cursor = "default";
+                d3.selectAll(".rect"+d)
                     .attr("stroke", "none");
-                d3.select(".text"+d)
+                d3.selectAll(".text"+d)
                     .attr("text-decoration", "none");
                 cmpSvg.selectAll("[class^=rect]")
                     .style("stroke", "white")
+                    
+                simSvg.select("."+d)
+                        .attr("r", function() {
+                            if (notableDrivers.includes(d)) {
+                                return 6;
+                            }
+                            return 3;
+                       });
+                labelAchievements.innerHTML = "<b>No Driver Highlighted</b><br>";
+                labelAchievements.innerHTML += "Points: ? - Starts: ? - Finishes: ? - Podiums: ? <br>";
+                labelAchievements.innerHTML += "Wins: ? - Poles: ? - Championships ?";
             })
             .on("click", function(d) {
-                if (allDrivers.includes(d)) {
-                    selectedDriver = d;
-                    initializeChartsLayout(data, data2);
+                if (!teammatesDisabled.includes(d)) {
+                    if (d == selectedDriver) {
+                        alert("Can't filter out the selected driver!");
+                        return;
+                    }
+                    if (teammatesDisabled.length == teammates.length-2) {
+                        alert("Can't filter out all teammates!");
+                        return;
+                    }
+                    teammatesDisabled.push(d);
+                    
+                    // Disables the entry in the constructor legend
+                    d3.selectAll(".rect"+d)
+                        .style("fill", "grey");
+                    d3.selectAll(".text"+d)
+                        .style("fill", "grey");
                 }
+                else {
+                    var index = teammatesDisabled.indexOf(d);
+                    teammatesDisabled.splice(index, 1);
+                    lastTeammateEnabled = d;
+                    
+                    // Restores the entry in the legend
+                    d3.selectAll(".rect"+d)
+                        .style("fill", colorsTeammates(d));
+                    d3.selectAll(".text"+d)
+                        .style("fill", "black");
+               }
+               var lastConstructorsDisabledSize = constructorsDisabled.length;
+               plotComparisons(data, data2);
+               plotPCA(data, data2);
+               if (constructorsDisabled.length != lastConstructorsDisabledSize) {
+                    plotPointsAchieved(data, data2);
+                    maxValueDNF = 0;
+                    minYearSelectedDNF = minYear;
+                    maxYearSelectedDNF = maxYear;
+                    minYearSelectedCons = minYear;
+                    maxYearSelectedCons = maxYear;
+                    drawDNFTimeSlider(data);
+                    plotDNF(data, minYearSelectedDNF, maxYearSelectedDNF, selectedTrackDNF);
+                    drawConsistencyTimeSlider(data);
+                    plotConsistency(data, minYearSelectedCons, maxYearSelectedCons, selectedTrackCons);
+               }
             });
     }
     
@@ -1269,6 +1507,7 @@
         // Adds the track selector with input event
         var svgDNFDiv2 = document.createElement('div');
         svgDNFDiv.appendChild(svgDNFDiv2);
+        svgDNFDiv.style.fontSize = "14px";
         svgDNFDiv2.appendChild(document.createTextNode("Show DNFs from: "));
         var selectTrack = document.createElement('select');
         selectTrack.id = "select-track-dnf";
@@ -1310,6 +1549,9 @@
     
     // Draws a time slider for the DNF lollipop chart
     function drawDNFTimeSlider(data) {
+        // Erase previous data
+        dnfTimeSliderSvg.selectAll('*').remove();
+        
         // Creates and adds the time slider
         var sliderDNF = d3.sliderBottom()
             .min(minYear)
@@ -1346,17 +1588,16 @@
         });
         
         // Initializes the x scale
-        maxValue = 0;
         for (i = 0; i < sortedRelevantDataDNF.length; i++) {
-            if (sortedRelevantDataDNF[i].value > maxValue) {
-                maxValue = sortedRelevantDataDNF[i].value;
+            if (sortedRelevantDataDNF[i].value > maxValueDNF) {
+                maxValueDNF = sortedRelevantDataDNF[i].value;
             }
         }
-        if (maxValue == 0) {
-            maxValue = 1;
+        if (maxValueDNF == 0) {
+            maxValueDNF = 1;
         }
         xDNF = d3.scaleLinear()
-            .domain([0, maxValue])
+            .domain([0, maxValueDNF])
             .range([0, small_chart_dimensions.width])
 
         // Initializes the y scale;
@@ -1421,13 +1662,13 @@
         
         // Handles the animations
         lines.transition()
-            .duration(2000)
+            .duration(animationsSpeed)
             .attr("x1", function(d) { 
                     return xDNF(d.value);
                 });   
         circles.transition()
-            .duration(2000)
-            .delay(1500)
+            .duration(animationsSpeed)
+            .delay(animationsSpeed-500)
             .style("opacity", 1);
         
         // Handles the inputs
@@ -1436,7 +1677,7 @@
             coords = d3.mouse(this);
             ratio = ((d.value)*100)/relevantDataDNF[0].value;
             text = "[" + d.key.substring(0, 3).toUpperCase() + ": " + d.value + " (" + ratio.toFixed(2) + "% of the races)] ";
-            drawOnMouseOverLabel(coords, dnfSvg, text, "black", d.value, 0, maxValue);
+            drawOnMouseOverLabel(coords, dnfSvg, text, "black", d.value, 0, maxValueDNF);
         });
         circles.on("mouseout", function(d) {
             d3.select(this).attr("r", "4");
@@ -1446,10 +1687,10 @@
         
         // Adds the stats under the graph
         finishesRatio = (relevantDataDNF[1].value*100)/relevantDataDNF[0].value;
-        labelTotalRacesDNF.innerHTML = "Number of finishes: " + relevantDataDNF[1].value + " (" + finishesRatio.toFixed(2) + "% of the races)<br>";
+        labelTotalRacesDNF.innerHTML = "<b>Finishes</b>: " + relevantDataDNF[1].value + " (" + finishesRatio.toFixed(2) + "%)";
         sumDNF = sortedRelevantDataDNF[0].value + sortedRelevantDataDNF[1].value + sortedRelevantDataDNF[2].value;
         dnfRatio = (sumDNF*100)/relevantDataDNF[0].value;
-        labelTotalRacesDNF.innerHTML += "Number of DNFs: " +  sumDNF + " (" + dnfRatio.toFixed(2) + "% of the races)";
+        labelTotalRacesDNF.innerHTML += "&nbsp&nbsp&nbsp<b>DNFs</b>: " +  sumDNF + " (" + dnfRatio.toFixed(2) + "%)";
     }
     
     // Prepares the layout for the chart that displays the consistency of the placements
@@ -1479,6 +1720,7 @@
         // Adds the track selector with input event
         var svgConsDiv2 = document.createElement('div');
         svgConsDiv.appendChild(svgConsDiv2);
+        svgConsDiv.style.fontSize = "14px";
         svgConsDiv2.appendChild(document.createTextNode("Show placements from: "));
         var selectTrack = document.createElement('select');
         selectTrack.id = "select-track-cons";
@@ -1520,8 +1762,11 @@
     
     // Draws a time slider fot the consistency plot box
     function drawConsistencyTimeSlider(data) {
+        // Erase previous data
+        consTimeSliderSvg.selectAll('*').remove();
+       
         // Creates and adds the time slider
-       var sliderConsistency = d3.sliderBottom()
+        var sliderConsistency = d3.sliderBottom()
             .min(minYear)
             .max(maxYear)
             .width(small_chart_dimensions.width)
@@ -1550,6 +1795,7 @@
         
         // Finds the relevant data
         var relevantData = findPlacements(data, selectedMinYear, selectedMaxYear, selectedTrack);
+        var stats = relevantData.pop();
         
         // Adds data about circuits if not already done
         if (flagAddCircuits == 0) {
@@ -1562,7 +1808,7 @@
         
         // Initializes the x scale
         xCons = d3.scaleLinear()
-            .domain([1, 22])
+            .domain([22, 1])
             .range([0, small_chart_dimensions.width])
             
         // Initializes the axis
@@ -1615,50 +1861,29 @@
 
             // Draws the main horizontal line
             consSvg.append("line")
-                .attr("x1", xCons(min))
-                .attr("x2", xCons(min))
+                .attr("x1", xCons(max))
+                .attr("x2", xCons(max))
                 .attr("y1", yCenter)
                 .attr("y2", yCenter)
                 .attr("stroke", "black")
                 .style("opacity", 0)
                 .transition()
-                    .duration(2000)
-                    .attr("x2", xCons(max))
+                    .duration(animationsSpeed)
+                    .attr("x1", xCons(min))
                     .style("opacity", 1);
 
             // Draws the box
             consSvg.append("rect")
-                .attr("x", xCons(q1))
+                .attr("x", xCons(q3))
                 .attr("y", yCenter - boxHeight/2)
                 .attr("height", boxHeight)
-                .attr("width", (xCons(q3)-xCons(q1)))
+                .attr("width", (xCons(q1)-xCons(q3)))
                 .style("stroke", "black")
                 .style("fill", "#69b3a2")
                 .style("opacity", 0)
-                .on("mouseover", function(d) {
-                    d3.select(this).style("stroke-width", 3);
-                    d3.select(".boxplot_line").style("stroke-width", 3);
-                    var coords = d3.mouse(this);
-                    var text = "";
-                    if (q1 == min && q3 == max) {
-                        text = "100% of Placements: [" + q1 + ", " + q3 + "] ";
-                    }
-                    else if (q1 == min || q3 == max) {
-                        text = "75% of Placements: [" + q1 + ", " + q3 + "] ";
-                    }
-                    else {
-                        text = "50% of Placements: [" + q1 + ", " + q3 + "] ";
-                    }
-                    drawOnMouseOverLabel(coords, consSvg, text, "black", q1, 1, 22);
-                })
-                .on("mouseout", function(d) {
-                    d3.select(this).style("stroke-width", 1);
-                    d3.select(".boxplot_line").style("stroke-width", 1);
-                    d3.select(".rect_label").remove();
-                })
                 .transition()
-                    .duration(2000)
-                    .delay(1500)
+                    .duration(animationsSpeed)
+                    .delay(animationsSpeed-500)
                     .style("opacity", 1);
 
             // Draws median, min and max vertical lines
@@ -1678,8 +1903,8 @@
                     .attr("stroke", "black")
                     .style("opacity", 0)
                     .transition()
-                        .duration(2000)
-                        .delay(1500)
+                        .duration(animationsSpeed)
+                        .delay(animationsSpeed-500)
                         .style("opacity", 1);
         }
         
@@ -1692,7 +1917,17 @@
                     .attr("cx", function(d) { 
                         return xCons(d); 
                     })
-                    .attr("cy", yCenter + boxHeight/2)
+                    .attr("cy", function(d, i) {
+                        if (i == 0) {
+                            return yCenter;
+                        }
+                        else if (i == 1) {
+                            return (yCenter + boxHeight/2);
+                        }
+                        else {
+                            return (yCenter + boxHeight);
+                        }
+                    })
                     .attr("r", "4")
                     .style("fill", "#69b3a2")
                     .style("opacity", 0)
@@ -1708,83 +1943,173 @@
                         d3.select(".rect_label").remove();
                     })   
                     .transition()
-                        .duration(2000)
+                        .duration(animationsSpeed)
                         .style("opacity", 1);
         }
             
-        // Refreshes the counter
+        // Refreshes the stats
         if (sortedRelevantResults.length >= 4) {
-            labelTotalRacesCons.innerHTML = "<br>Number of finishes: " + relevantData.length + "<br>";
+            if (q1 == min && q3 == max) {
+                labelTotalRacesCons.innerHTML = "<b>Consistency</b>: 100% of placements between " + q1 + " and " + q3 + "<br>";
+            }
+            else if (q1 == min || q3 == max) {
+                labelTotalRacesCons.innerHTML = "<b>Consistency</b>: 75% of placements between " + q1 + " and " + q3 + "<br>";
+            }
+            else {
+                labelTotalRacesCons.innerHTML = "<b>Consistency</b>: 50% of placements between " + q1 + " and " + q3 + "<br>";
+            }
         }
         else {
             labelTotalRacesCons.innerHTML = "Not enough data to draw a box-plot!<br>";
-            labelTotalRacesCons.innerHTML += "Number of finishes: " + relevantData.length + "<br>";
         }
+        var finishesRatio = (relevantData.length*100)/stats.starts;
+        var winsRatio = (stats.wins*100)/stats.starts;
+        var podiumsRatio = (stats.podiums*100)/stats.starts;
+        labelTotalRacesCons.innerHTML += "<b>Finishes</b>: " + relevantData.length + " (" + finishesRatio.toFixed(2) + "%)";
+        labelTotalRacesCons.innerHTML += "&nbsp&nbsp&nbsp<b>Wins</b>: " + stats.wins + " (" + winsRatio.toFixed(2) + "%)";
+        labelTotalRacesCons.innerHTML += "&nbsp&nbsp&nbsp<b>Podiums</b>: " + stats.podiums + " (" + podiumsRatio.toFixed(2) + "%)";
     }
     
-    // Prepares the layout for the chart that displays similar drivers to the one selected
-    function prepareSimilarDrivers(data, data2) {
-        // Initializes the div that contains the svg area for the points bars    
+    // Prepares the layout for the chart that displays the PCA
+    function preparePCA(data, data2) {
+        // Initializes the div that contains the svg area for the PCA  
         svgSimDiv = document.createElement('div');
         svgSimDiv.id = "similar-drivers";
-        svgSimDiv.innerHTML = "<b>Top 5 Drivers With Similar Achievements</b><br>";
+        svgSimDiv.innerHTML = "<b>Place In The Sport's History</b><br>";
         svgSimDiv.onmouseover = function() {
             writeOnAbout(5);
         }
         bottomWrapper.append(svgSimDiv); 
         
-        // Initalizes an empty svg for the similar drivers chart
+        // Initalizes an empty svg for the PCA chart
         simSvg = d3.select('#similar-drivers')
             .append('svg')
                 .attr("width", small_container_dimensions.width-119)
                 .attr("height", small_container_dimensions.height+25)
                 //.style("background-color", "red")
             .append("g")
-                .attr("transform", "translate(" + margins.left + "," + margins.top + ")")
+                .attr("transform", "translate(" + (margins.left-10) + "," + margins.top + ")")
                 .attr("id", "similar-drivers");
         
         // Initializes the div for the legend
         svgSimLegendDiv = document.createElement('div');
-        svgSimLegendDiv.innerHTML = "Legend Table<br>";
+        svgSimLegendDiv.innerHTML = "Drivers<br>";
         svgSimLegendDiv.id = "simlegendtable";
         svgSimLegendDiv.onmouseover = function() {
             writeOnAbout(5);
         }
-        bottomWrapper.append(svgSimLegendDiv);
+        var div = document.createElement('div');
+        div.append(svgSimLegendDiv);
+        bottomWrapper.append(div);
         
         // Text under the graph
         var textDiv = document.createElement('div');
         svgSimDiv.appendChild(textDiv);
         labelAchievements = document.createElement('label');
         labelAchievements.style.fontSize = "12px";
+        labelAchievements.innerHTML = "<b>No Driver Highlighted</b><br>";
+        labelAchievements.innerHTML += "Points: ? - Starts: ? - Finishes: ? - Podiums: ? <br>";
+        labelAchievements.innerHTML += "Wins: ? - Poles: ? - Championships ?";
         textDiv.appendChild(labelAchievements);
         
         // Initializes the empty svg for the legend
         svgSimLegend = d3.select('#simlegendtable')
             .append('svg')
                 .attr("width", legend_width)
-                .attr("height", small_container_dimensions.height)
-                // .style("background-color", "red")
+                .attr("height", small_container_dimensions.height-30)
+                .attr("class", ".svgSim")
+                //.style("background-color", "red")
                 .append("g")
                     .attr("transform", "translate(" + 0 + "," + margins.top/4 + ")")
                     .attr("id","simlegendtable");
-       
+        
+        // Radio buttons under the legend
+        var optionsDiv = document.createElement('div');
+        div.appendChild(optionsDiv);
+        optionsDiv.style.fontSize = "14px";
+        optionsDiv.style.textAlign = "left";
+        optionsDiv.innerHTML = "Focus On: <br>";
+        
+        var everyoneButton = document.createElement('input');
+        everyoneButton.type = 'radio';
+        everyoneButton.name = 'pca-mode';
+        everyoneButton.id = 'show-everyone';
+        everyoneButton.value = "show-everyone";
+        var label = document.createElement('label');
+        label.innerHTML = "Everyone";
+        optionsDiv.appendChild(everyoneButton);
+        optionsDiv.appendChild(label);
+        optionsDiv.innerHTML += "<br>";
+        
+        var top5Button = document.createElement('input');
+        top5Button.type = 'radio';
+        top5Button.name = 'pca-mode';
+        top5Button.id = 'show-top5';
+        top5Button.value = 'show-top5';
+        label = document.createElement('label');
+        label.innerHTML = "Closest 5";
+        optionsDiv.appendChild(top5Button);
+        optionsDiv.appendChild(label);
+        optionsDiv.innerHTML += "<br>";
+        
+        var top10Button = document.createElement('input');
+        top10Button.type = 'radio';
+        top10Button.name = 'pca-mode';
+        top10Button.id = 'show-top10';
+        top10Button.value = 'show-top10';
+        label = document.createElement('label');
+        label.innerHTML = "Closest 10";
+        optionsDiv.appendChild(top10Button);
+        optionsDiv.appendChild(label);
+        optionsDiv.innerHTML += "<br>";
+        
+        var teammatesButton = document.createElement('input');
+        teammatesButton.type = 'radio';
+        teammatesButton.name = 'pca-mode';
+        teammatesButton.id = 'show-teammates';
+        teammatesButton.value = 'show-teamamtes';
+        label = document.createElement('label');
+        label.innerHTML = "Teammates";
+        optionsDiv.appendChild(teammatesButton);
+        optionsDiv.appendChild(label);
+        document.getElementById("show-everyone").checked = true;
+ 
+        document.getElementById('show-everyone').onclick = function() {
+            PCAmode = 0;
+            plotPCA(data, data2);
+        }
+ 
+        document.getElementById('show-top5').onclick = function() {
+            PCAmode = 1;
+            plotPCA(data, data2);
+        }
+        
+        document.getElementById('show-top10').onclick = function() {
+            PCAmode = 2;
+            plotPCA(data, data2);
+        }
+        document.getElementById('show-teammates').onclick = function() {
+            PCAmode = 3;
+            plotPCA(data, data2);
+        }
+  
+        // Check if the python script has answered back
         if (PCAdata.length) {  
-            plotSimilarDrivers(data, data2);
+            plotPCA(data, data2);
         }
         else {
             labelAchievements.innerHTML = "PCA not available right now! The python script is offline!";
         }
     }
     
-    // Plots the layout that displays similar drivers to the one selected
-    function plotSimilarDrivers(data, data2) {
+    // Plots the layout that displays the PCA
+    function plotPCA(data, data2) {
         // Erase previous data
         simSvg.selectAll('*').remove();
         
         // Gets PCA values of the selected driver
+        notableDrivers = [selectedDriver];
         relevantData = [];
-        var similarDrivers = [selectedDriver];
         pca1 = 0;
         pca2 = 0;
         for (i = 0; i < PCAdata.length; i++) {
@@ -1795,59 +2120,79 @@
             }
         }   
         
-        // Finds the top 5 most similar drivers
-        chosenIndexes = [];
-        var counter = 0;
-        var maxCloseness = 30;
-        var index = 0;
-        var maxPCA1 = pca1;
-        var maxPCA2 = pca2;
-        while (counter < 5) {
-            for (i = 0; i < PCAdata.length; i++) {
-                if (PCAdata[i].driver != selectedDriver && counter < 5) {
-                    var a = pca1 - PCAdata[i].pca1;
-                    var b = pca2 - PCAdata[i].pca2;
-                    var closeness = Math.sqrt(a*a + b*b);
-                    if (closeness < maxCloseness && !chosenIndexes.includes(i)) {
-                        maxCloseness = closeness;
-                        index = i;
+        // Finds the top most similar drivers
+        if (PCAmode == 1 || PCAmode == 2) {
+            var top = 0;
+            if (PCAmode == 1) {
+                top = 5;
+            }
+            else {
+                top = 10;
+            }
+            chosenIndexes = [];
+            var counter = 0;
+            var maxCloseness = 30;
+            var index = 0;
+            while (counter < top) {
+                for (i = 0; i < PCAdata.length; i++) {
+                    if (PCAdata[i].driver != selectedDriver && counter < top) {
+                        var a = pca1 - PCAdata[i].pca1;
+                        var b = pca2 - PCAdata[i].pca2;
+                        var closeness = Math.sqrt(a*a + b*b);
+                        if (closeness < maxCloseness && !chosenIndexes.includes(i)) {
+                            maxCloseness = closeness;
+                            index = i;
+                        }
                     }
                 }
+                if (!chosenIndexes.includes(index)) {
+                    notableDrivers.push(PCAdata[index].driver);
+                    chosenIndexes.push(index);
+                    if (!teammatesDisabled.includes(PCAdata[index].driver) && !driversDisabled.includes(PCAdata[index].driver)) {
+                        relevantData.push(PCAdata[index]);
+                    }     
+                } 
+                counter += 1;
+                maxCloseness = 30;
+                index = 0;
             }
-            if (!chosenIndexes.includes(index)) {
-                relevantData.push(PCAdata[index]);
-                similarDrivers.push(PCAdata[index].driver);
-                chosenIndexes.push(index);
-                if (Math.abs(PCAdata[index].pca1) > maxPCA1) {
-                    maxPCA1 = Math.abs(PCAdata[index].pca1);
-                }
-                if (Math.abs(PCAdata[index].pca2) > maxPCA2) {
-                    maxPCA2 = Math.abs(PCAdata[index].pca2);
-                }
-            }
-           
-            counter += 1;
-            maxCloseness = 30;
-            index = 0;
         }
-        
-        if (maxPCA1 < maxPCA2) {
-            maxPCA1 = maxPCA2
-        } 
+        // Finds the the PC values of the teammates
+        else if (PCAmode == 3) {
+            notableDrivers = teammates.slice();
+            for (i = 0; i < notableDrivers.length; i++) {
+                if (!allDrivers.includes(notableDrivers[i])) {
+                    notableDrivers.splice(i, 1);
+                 }
+            }      
+            for (i = 0; i < PCAdata.length; i++) {
+                if (PCAdata[i].driver != selectedDriver && teammates.includes(PCAdata[i].driver) && !teammatesDisabled.includes(PCAdata[i].driver)) {
+                    relevantData.push(PCAdata[i]);
+                }
+            }
+        }   
+        else {
+            for (i = 0; i < PCAdata.length; i++) {
+                if (PCAdata[i].driver != selectedDriver && !teammatesDisabled.includes(PCAdata[i].driver) && !driversDisabled.includes(PCAdata[i].driver)) {
+                    relevantData.push(PCAdata[i]);
+                }
+            }
+            notableDrivers.push("Other");
+        }
 
-        // Initializes the PCA1 scale
+        // Initializes the PCA1 and PCA2 scales
         pca1Scale = d3.scaleLinear()
-            .domain([-maxPCA1, maxPCA1])
-            .range([0, small_container_dimensions.height]);
-        
-        // Initializes the PCA2 scale
+            .domain(d3.extent(relevantData, function(d) {
+                return d.pca1;
+            }))
+            .range([0, small_chart_dimensions.width-110]);
         pca2Scale = d3.scaleLinear()
-            .domain([maxPCA1, -maxPCA1])
-            .range([0, small_container_dimensions.height]);
-        
-        // Initializes the colors
-        simColors = d3.scaleOrdinal(d3.schemeCategory10);
-            
+            .domain(d3.extent(relevantData, function(d) {
+                return d.pca2;
+            }).reverse())
+            .range([0, 200]);
+       
+               
         // Initializes the axis
         pca1Axis = d3.axisBottom(pca1Scale).ticks(0);
         pca2Axis = d3.axisLeft(pca2Scale).ticks(0);
@@ -1855,26 +2200,25 @@
         // Appends the PCA1 axis
         simSvg.append("g")
             .attr("class","pca1_axis")
-            .attr("transform", "translate(0,"+(small_chart_dimensions.height-45)+")")
+            .attr("transform", "translate(0,"+200+")")
             .call(pca1Axis);
         simSvg.append("text")
             .attr("class","label")
-            .attr("x", small_chart_dimensions.height+60)
-            .attr("y", small_chart_dimensions.height-30)
+            .attr("x", small_chart_dimensions.width-110)
+            .attr("y", 212)
             .style("text-anchor","end")
             .style("font", "12px times")
             .text("PC1");
         
         // Appends the PCA2 axis
         simSvg.append("g")
-            .attr("transform", "translate("+(105)+",0)")
             .attr("class","pca2_axis")
             .call(pca2Axis);
         simSvg.append("text")
             .attr("class","label")
-            .attr("transform", "translate("+(125)+",0)" + "rotate(-90)")
+            .attr("transform", "rotate(-90)")
             .attr("y", 6)
-            .attr("dy","-2.5em")
+            .attr("dy","-1.2em")
             .style("text-anchor","end")
             .style("font", "12px times")
             .text("PC2");
@@ -1893,14 +2237,34 @@
                 .attr("cy", function(d) { 
                     return pca2Scale(d.pca2); 
                 })
-                .attr("r", 6)
-                .style("fill", function(d) {
-                    return simColors(d.driver);
+                .attr("r", function(d) {
+                    if (!notableDrivers.includes(d.driver)) {
+                        return 3;
+                    }
+                    return 6;
                 })
+                .style("fill", function(d) {
+                    if (!notableDrivers.includes(d.driver)) {  
+                        return "orange";
+                    }
+                    return colorsTeammates(d.driver);
+                })
+                .style("opacity", 0)
                 .style("stroke", "black");
         
+        circles
+            .transition()
+                .duration(animationsSpeed)
+                .style("opacity", 1);
+        
         circles.on("mouseover", function(d) {
-            d3.select(this).attr("r", 8);
+            // Highligths circle and update stats
+            if (d3.select(this).attr("r") == 6) {
+                d3.select(this).attr("r", 8);
+            }
+            else {
+                d3.select(this).attr("r", 5);
+            }
             var currentDriverAchievements = [];
             for (i = 0; i < achievements.length; i++) {
                 if (achievements[i].driver == d.driver) {
@@ -1908,40 +2272,67 @@
                 }
             }
             labelAchievements.innerHTML = "<b>"+d.driver.replace(/_/g, ' ')+"</b><br>";
-            labelAchievements.innerHTML += "Points: " + currentDriverAchievements.points + " - Wins: " + currentDriverAchievements.wins;
-            labelAchievements.innerHTML += " - Poles: " + currentDriverAchievements.poles + " - Championships " + currentDriverAchievements.championships;
-        });
-        
-        circles.on("mouseout", function(d) {
-            d3.select(this).attr("r", 6);
-            labelAchievements.innerHTML = "";
-        });
-        
-        circles.on("click", function(d) {
-            if (allDrivers.includes(d.driver)) {
-                selectedDriver = d.driver;
-                initializeChartsLayout(data, data2);
+            labelAchievements.innerHTML += "Points: " + currentDriverAchievements.points + " - Starts: " + currentDriverAchievements.starts + " - Finishes: " + currentDriverAchievements.finishes + " - Podiums: " + currentDriverAchievements.podiums + "<br>";
+            labelAchievements.innerHTML += "Wins: " + currentDriverAchievements.wins + " - Poles: " + currentDriverAchievements.poles + " - Championships " + currentDriverAchievements.championships;
+            
+            // Highlights the right bars in the teammate chart
+            if (d.driver == selectedDriver) {
+                cmpSvg.selectAll("[class^=rect0]")
+                    .style("stroke", "black");
+            }
+            else {
+                cmpSvg.selectAll("[class^=rect0][class$=" + d.driver + "]")
+                    .style("stroke", "black");
+                cmpSvg.selectAll("[class^=rect1][class$=" + d.driver + "]")
+                    .style("stroke", "black");
             }
         });
         
+        circles.on("mouseout", function(d) {
+            // Restores everything
+            if (d3.select(this).attr("r") == 8) {
+                d3.select(this).attr("r", 6);
+            }
+            else {
+                d3.select(this).attr("r", 3);
+            }
+            labelAchievements.innerHTML = "<b>No Driver Highlighted</b><br>";
+            labelAchievements.innerHTML += "Points: ? - Starts: ? - Finishes: ? - Podiums: ? <br>";
+            labelAchievements.innerHTML += "Wins: ? - Poles: ? - Championships ?";
+            
+            // Restores everything in the teammate chart
+            cmpSvg.selectAll("[class^=rect]")
+                .style("stroke", "white");
+        });
+        
         // Draws the legend
-        plotSimilarDriversLegend(data, data2, similarDrivers);
+        plotPCALegend(data, data2, notableDrivers);
     }
     
     // Draws the legend for the similar drivers chart
-    function plotSimilarDriversLegend(data, data2, similarDrivers) {
+    function plotPCALegend(data, data2, notableDrivers) {
         // Erase previous data
         svgSimLegend.selectAll('*').remove();
+        
+        svgSimLegend.append("text")
+            .style("font", "12px times")
+            .attr("y", 5)
+            .text("Click to filter data!");
+        
+         // Resize the legend if there too many entries
+        if (teammates.length > 11) {
+            d3.select(".svgSim").attr("height", (teammates.length*sizeSquare*1.5)+10);
+        }
         
         // Prepares the space/layout for the legend
         sizeSquare = 10;
         legend = svgSimLegend.selectAll("legend")
-            .data(similarDrivers)
+            .data(notableDrivers)
             .enter()
             .append("g")
             .attr("class", "legend")
 			.attr("transform", function(d,i){
-                return "translate(0,"+(i*sizeSquare+i*5)+")";
+                return "translate(0,"+((i+1)*sizeSquare+i*5)+")";
             });
         
         // Draws the small colored rectangles
@@ -1952,7 +2343,13 @@
                 return "rect"+d;
             })
 			.style("fill", function(d){
-                return simColors(d);
+                if (d == "Other") {
+                    return "orange";
+                }
+                if (teammatesDisabled.includes(d) || driversDisabled.includes(d)) {
+                    return "grey";
+                }
+                return colorsTeammates(d);
 			});
             
         // Writes the text near the small colored rectangles
@@ -1964,6 +2361,12 @@
             .attr("y", sizeSquare/2)
             .attr("dy", ".35em")
             .style("font", "12px times")
+            .style("fill", function(d) {
+                if (teammatesDisabled.includes(d) || driversDisabled.includes(d)) {
+                    return "grey";
+                }
+                return "black";
+            })    
             .text(function(d) {
                 return d.replace(/_/g, ' ');
             });
@@ -1971,13 +2374,16 @@
         // Add input events to the legend
         legend
             .on("mouseover", function(d) {
+                document.body.style.cursor = "pointer";
                 // Highlights the entry in the legend and outlines the right bars
-                if (allDrivers.includes(d)) {
-                    svgSimLegend.select(".rect"+d)
-                        .attr("stroke", "black");
-                    svgSimLegend.select(".text"+d)
-                        .attr("text-decoration", "underline overline");    
+                if (d == "Other") {
+                    return;
                 }
+                d3.selectAll(".rect"+d)
+                    .attr("stroke", "black");
+                d3.selectAll(".text"+d)
+                    .attr("text-decoration", "underline overline");    
+                    
                 simSvg.select("."+d)
                         .attr("r", 8);
                 currentDriverAchievements = [];
@@ -1987,23 +2393,111 @@
                     }
                 }
                 labelAchievements.innerHTML = "<b>"+d.replace(/_/g, ' ')+"</b><br>";
-                labelAchievements.innerHTML += "Points: " + currentDriverAchievements.points + " - Wins: " + currentDriverAchievements.wins;
-                labelAchievements.innerHTML += " - Poles: " + currentDriverAchievements.poles + " - Championships " + currentDriverAchievements.championships;
+                labelAchievements.innerHTML += "Points: " + currentDriverAchievements.points + " - Starts: " + currentDriverAchievements.starts + " - Finishes: " + currentDriverAchievements.finishes + " - Podiums: " + currentDriverAchievements.podiums + "<br>";
+                labelAchievements.innerHTML += "Wins: " + currentDriverAchievements.wins + " - Poles: " + currentDriverAchievements.poles + " - Championships " + currentDriverAchievements.championships;
+                
+                // Highlights the right bars in the teammate chart
+                if (d == selectedDriver) {
+                    cmpSvg.selectAll("[class^=rect0]")
+                        .style("stroke", "black");
+                }
+                else {
+                    cmpSvg.selectAll("[class^=rect0][class$=" + d + "]")
+                        .style("stroke", "black");
+                    cmpSvg.selectAll("[class^=rect1][class$=" + d + "]")
+                        .style("stroke", "black");
+                }
             })
             .on("mouseout", function(d) {
+                document.body.style.cursor = "default";
                 // Restores everything
-                svgSimLegend.select(".rect"+d)
+                d3.selectAll(".rect"+d)
                     .attr("stroke", "none");
-                svgSimLegend.select(".text"+d)
+                d3.selectAll(".text"+d)
                     .attr("text-decoration", "none");
                 simSvg.select("."+d)
                     .attr("r", 6);
-                labelAchievements.innerHTML = "";
+                labelAchievements.innerHTML = "<b>No Driver Highlighted</b><br>";
+                labelAchievements.innerHTML += "Points: ? - Starts: ? - Finishes: ? - Podiums: ? <br>";
+                labelAchievements.innerHTML += "Wins: ? - Poles: ? - Championships ?";
+                
+                // Restores everything in the teammate chart
+                cmpSvg.selectAll("[class^=rect]")
+                    .style("stroke", "white");
             })
             .on("click", function(d) {
-                if (allDrivers.includes(d)) {
-                    selectedDriver = d;
-                    initializeChartsLayout(data, data2);
+                if (d == "Other") {
+                        alert("Can't disable all points in the PCA!");
+                        return;
+                }
+                else if (!teammatesDisabled.includes(d) && teammates.includes(d)) {
+                    if (d == selectedDriver) {
+                        alert("Can't filter out the selected driver!");
+                        return;
+                    }
+                    if (teammatesDisabled.length == teammates.length-2) {
+                        alert("Can't filter out all teammates!");
+                        return;
+                    }
+                    
+                    teammatesDisabled.push(d);
+                    
+                    // Disables the entry in the constructor legend
+                    d3.selectAll(".rect"+d)
+                        .style("fill", "grey");
+                    d3.selectAll(".text"+d)
+                        .style("fill", "grey");
+                }
+                else if (teammates.includes(d)) {
+                    var index = teammatesDisabled.indexOf(d);
+                    teammatesDisabled.splice(index, 1);
+                    lastTeammateEnabled = d;
+                    
+                    // Restores the entry in the legend
+                    d3.selectAll(".rect"+d)
+                        .style("fill", colorsTeammates(d));
+                    d3.selectAll(".text"+d)
+                        .style("fill", "black");
+                }
+                else if (!driversDisabled.includes(d)) {
+                    driversDisabled.push(d);
+                    
+                    // Disables the entry in the constructor legend
+                    d3.selectAll(".rect"+d)
+                        .style("fill", "grey");
+                    d3.selectAll(".text"+d)
+                        .style("fill", "grey");
+                }
+                else {
+                    var index = driversDisabled.indexOf(d);
+                    driversDisabled.splice(index, 1);
+                    
+                    // Restores the entry in the legend
+                    d3.selectAll(".rect"+d)
+                        .style("fill", colorsTeammates(d));
+                    d3.selectAll(".text"+d)
+                        .style("fill", "black");
+                }
+ 
+                if (teammates.includes(d)) {
+                    var lastConstructorsDisabledSize = constructorsDisabled.length;
+                    plotComparisons(data, data2);
+                    plotPCA(data, data2);
+                    if (constructorsDisabled.length != lastConstructorsDisabledSize) {
+                        plotPointsAchieved(data, data2);
+                        maxValueDNF = 0;
+                        minYearSelectedDNF = minYear;
+                        maxYearSelectedDNF = maxYear;
+                        minYearSelectedCons = minYear;
+                        maxYearSelectedCons = maxYear;
+                        drawDNFTimeSlider(data);
+                        plotDNF(data, minYearSelectedDNF, maxYearSelectedDNF, selectedTrackDNF);
+                        drawConsistencyTimeSlider(data);
+                        plotConsistency(data, minYearSelectedCons, maxYearSelectedCons, selectedTrackCons);
+                    }
+                }
+                else {
+                    plotPCA(data, data2);
                 }
             });
     }
@@ -2064,30 +2558,48 @@
     
     // Writes the right text on the upper right section of the application
     function writeOnAbout(index) {
+        // Change some attributes of the div
+        if (index >= 0 && index <= 2) {
+            about.style.paddingTop = "5px";
+            about.style.fontSize = "13px";
+            about.style.height = "71px";
+        }
+        else {
+            about.style.paddingTop = "2px";
+            about.style.fontSize = "12px";
+            about.style.height = "74px";
+        }
+        
         if (index == 0) {
             about.innerHTML = "<b>- ABOUT -</b><br>";
             about.innerHTML += "This VA application allows the user to find stats on Formula 1 drivers since 1994, so that they can gain a better knowledge of their skill and place in the sport.<br>";
             about.innerHTML += "<i>- Made by Luca Sannino as a project for Visual Analytics 2021 -</i>";
         }
         else if (index == 1) {
+            
             about.innerHTML = "<b>- POINTS PER SEASON -</b><br>";
-            about.innerHTML += "This bar chart shows the total points achieved by the selected driver per season. The user can also switch to the avg. points per race (per season) and interact with the bars by clicking them to calculate new averages on-the-fly.";
+            about.innerHTML += "This bar chart shows the points achieved by the selected driver per season.<br>"
+            about.innerHTML += "<b>Interactions</b>: Clicking on bars to calculate averages; Clicking on the legend to filter data about a constructor.";
         }
         else if (index == 2) {
             about.innerHTML = "<b>- WINS/LOSSES AGAINST TEAMMATES -</b><br>";
-            about.innerHTML += "This bar chart shows how many times the selected driver has placed better than their teammates across the seasons. The user can also switch between race and qualifying results and interact with the legend to select a new driver.";
+            about.innerHTML += "This bar chart shows how many times the selected driver has placed better than their teammates across the seasons, both in races and qualifying.<br>";
+            about.innerHTML += "<b>Interactions</b>: Clicking on the legend to filter data about a teammate.";
         }
         else if (index == 3) {
             about.innerHTML = "<b>- DNFs' CAUSES -</b><br>";
-            about.innerHTML += "This lollipop chart shows the causes of DNFs. 'Physical' includes cases of external damage to the car (tyre punctures, broken wings etc.), while 'Mechanical' includes damage to the internal components (power loss, engine on fire etc.)."; 
+            about.innerHTML += "This lollipop chart shows the causes of DNFs. '<b>Damage</b>' includes cases of external damage to the car (tyre punctures, broken wings etc.), while '<b>Reliability</b>' includes issues to the internal components (power loss, engine on fire etc.).<br>"; 
+            about.innerHTML += "<b>Interactions</b>: Using the time slider and selecting circuits to focus on a part of the data."
         }
         else if (index == 4) {
             about.innerHTML = "<b>- PLACEMENTS' CONSISTENCY ON FINISHES -</b><br>";
-            about.innerHTML += "This box-plot chart shows the distribution of the placements upon finishes. A quartile of the distribution falls in each of the four sections, meaning that the gray box represents ~50% of the placements.";
+            about.innerHTML += "This box-plot chart shows the distribution of the placements upon finishes. A quartile of the distribution falls in each of the four sections, meaning that the gray box represents ~50% of the placements.<br>";
+            about.innerHTML += "<b>Interactions</b>: Using the time slider and selecting circuits to focus on a part of the data."
         }
         else if (index == 5) {
-            about.innerHTML = "<b>- TOP 5 DRIVERS WITH SIMILAR ACHIEVEMENTS -</b><br>";
-            about.innerHTML += "This scatter plot chart shows the five most similar drivers to the one selected in terms of career achievements. The closeness of the points was calculated using PCA on multidimensional data. Users can click on the drivers to see their stats.";
+            about.innerHTML = "<b>- PLACE IN THE SPORT'S HISTORY -</b><br>";
+            about.innerHTML += "This scatter plot chart shows the placement of the selected driver in terms of career achievements, alongside other drivers since 1994. The closeness of the points was calculated using PCA on multidimensional data.<br>";
+            about.innerHTML += "<b>Interactions</b>: Clicking on the legend to filter data about a driver."
         }
     }
           
@@ -2109,6 +2621,13 @@
             }
         }
         
+        filteredResults = [];
+        for (i = 0; i < relevantResults.length; i++) {
+            if (!constructorsDisabled.includes(relevantResults[i].constructor)) {
+                filteredResults.push(relevantResults[i]);
+            }
+        }
+        
         // Groups the relevant results by year/constructor and finds the total number of points by year/constructor
         if (showTotalPoints) {
             relevantResults = d3.nest()
@@ -2125,7 +2644,7 @@
                         })
                     }
                 })
-                .entries(relevantResults);
+                .entries(filteredResults);
         }
         // Groups the relevant results by year/constructor and finds the average number of points per race by year/constructor
         else {
@@ -2143,7 +2662,7 @@
                         })
                     }
                 })
-                .entries(relevantResults);
+                .entries(filteredResults);
         }
         
         /* DEBUG
@@ -2180,6 +2699,25 @@
                     j = -1;
                 }
                 else if ((constructorResults[j].surname + "_" + constructorResults[j].name) != selectedDriver && findTeammates == true) {
+                    // Restore a constructor if the user has filtered in a driver which drove for a previously filtered out constructor
+                    if (lastTeammateEnabled == (constructorResults[j].surname + "_" + constructorResults[j].name)) {
+                        lastTeammateEnabled = "";
+                        if (constructorsDisabled.includes(constructorResults[j].constructor)) {
+                            var index = constructorsDisabled.indexOf(constructorResults[j].constructor);
+                            constructorsDisabled.splice(index, 1);
+                        }
+                    }
+                    
+                    // The data is not of interest because the constructor is filtered out
+                    if (constructorsDisabled.includes(constructorResults[j].constructor)) {
+                        continue;
+                    }
+                    
+                    // The data is not of interest because the driver is filtered out
+                    if (teammatesDisabled.includes(constructorResults[j].surname + "_" + constructorResults[j].name) && lastConstructorEnabled != constructorResults[j].constructor) {
+                        continue;
+                    }
+                        
                     newTuple = {
                         year: constructorResults[j].year,
                         round: constructorResults[j].round,
@@ -2196,6 +2734,7 @@
                 }
             }
         }
+        lastConstructorEnabled = "";
         
         // Transforms the data in the final form used by the chart
         relevantData = d3.nest()
@@ -2234,10 +2773,22 @@
                         }
                         return 0;
                     }),
+                    constructor: ""
                }
             })
             .entries(newTuples);   
-                
+        
+        // Adds the constructors to the data
+        relevantData.forEach(function(d) {
+            var year = d.key.substring(0, 4); 
+            var teammate = d.key.substring(5, d.key.length);
+            newTuples.forEach(function(f) {
+                if (f.year == year && ((f.teammateSurname + "_" + f.teammateName) == teammate)) {
+                    d.value.constructor = f.constructor;
+                }
+            });
+        });
+        
         /* DEBUG
         console.log(relevantData); */
         
@@ -2260,12 +2811,15 @@
             if (driverKey == selectedDriver) {
                 driverResults = groupedResults[i].values;
                 for (j = 0; j < driverResults.length; j++) {
-                    if (index != 0) {
-                        currentTrack = circuits[index-1];
-                        if (currentTrack != driverResults[j].circuit) {
-                            continue;
-                        }
+                    // Check if the current race was set in a circuit selected by the user
+                    if (index != 0 && circuits[index-1] != driverResults[j].circuit) {
+                       continue;
                     }
+                    // Check if the driver was driving for a filtered out constructor
+                    if (constructorsDisabled.includes(driverResults[j].constructor)) {
+                        continue;
+                    }
+                    // Everything's ok!
                     tuple = {
                             year: driverResults[j].year,
                             round: driverResults[j].round,
@@ -2350,9 +2904,9 @@
         relevantResults.push(tuple);
         tuple = {key: "Retirement", value: retiredTotal};
         relevantResults.push(tuple);
-        tuple = {key: "Physical", value: physicalTotal};
+        tuple = {key: "Damage", value: physicalTotal};
         relevantResults.push(tuple);
-        tuple = {key: "Mechanical", value: mechanicalTotal};
+        tuple = {key: "Reliability", value: mechanicalTotal};
         relevantResults.push(tuple);
         
         /* DEBUG
@@ -2372,6 +2926,9 @@
         
         // Finds the results of the selected pilot between the chosen range of years, and keeps track of the circuits
         var relevantResults = [];
+        var starts = 0;
+        var wins = 0;
+        var podiums = 0;
         for (i = 0; i < groupedResults.length; i++) {
             var key = groupedResults[i].key;
             if (key == selectedDriver) {
@@ -2380,20 +2937,45 @@
                     if (!circuits.includes(values[j].circuit)) {
                         circuits.push(values[j].circuit);
                     }
-                    if (values[j].year >= minYear && values[j].year <= maxYear && (values[j].status == "Finished" || values[j].status.substring(0, 1) == "+")) {
-                        if (index == 0) {
-                            relevantResults.push(parseInt(values[j].position));
-                        }
-                        else {
-                            currentTrack = circuits[index-1];
-                            if (values[j].circuit == currentTrack) {
-                                relevantResults.push(parseInt(values[j].position));
+                    
+                    // Check if the current race was set in a circuit selected by the user
+                    if (index != 0 && circuits[index-1] != values[j].circuit) {
+                        continue;
+                    }
+                    
+                    // Check if the driver was driving for a filtered out constructor
+                    if (constructorsDisabled.includes(values[j].constructor)) {
+                        continue;
+                    }
+                    
+                    // Check if driver was driving in the selected time frame
+                    if (values[j].year >= minYear && values[j].year <= maxYear) {
+                        starts += 1;
+                        
+                        // Check if the driver reached the finish line
+                        if (values[j].status == "Finished" || values[j].status.substring(0, 1) == "+") {
+    
+                            // Refresh wins/podiums counter
+                            if (parseInt(values[j].position) >= 1 && parseInt(values[j].position) <= 3) {
+                                podiums += 1;
+                                if (parseInt(values[j].position) == 1) {
+                                    wins += 1;
+                                }
                             }
+                            relevantResults.push(parseInt(values[j].position));
                         }
                     }
                 }
             }
         }
+        
+        // Create a tuple with the stats
+        var newTuple = {
+            starts: starts,
+            wins: wins,
+            podiums: podiums
+        }
+        relevantResults.push(newTuple);
         
         /* DEBUG
         console.log(relevantResults); */
