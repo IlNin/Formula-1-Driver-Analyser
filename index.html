@@ -73,6 +73,7 @@
     var teammatesDisabled = []; // List of teammates that the user is not interested in
     var teammatesShowing = []; // List of teammates that are actually showing on the chart
     var lastTeammateEnabled = ""; // The last teammate that the user has enabled
+    var notableDrivers = []; // List of drivers that are featured in the PCA
 
     // Avg line parameters
     var barsClicked = []; // List of bars clicked in the total points chart
@@ -929,21 +930,7 @@
                     d3.select(".rect"+d)
                         .style("fill", "grey");
                     d3.select(".text"+d)
-                        .style("fill", "grey");
-                        
-                    /* Disables the right teammates
-                    cmpSvg.selectAll("[class^=rect1]")
-                        .style("opacity", function() {
-                            if (d3.select(this).attr("id") == d) {
-                                var teammate = d3.select(this).attr("class").substring(10, d3.select(this).attr("class").length);
-                                if (!teammatesDisabled.includes(teammate)) {
-                                    teammatesDisabled.push(teammate);
-                                }
-                                return d3.select(this).style("opacity");
-                            }
-                            return d3.select(this).style("opacity");
-                        }); */
-                        
+                        .style("fill", "grey");  
                 }
                 // Restores the data regarding that constructor in all the charts
                 else {
@@ -956,25 +943,6 @@
                         .style("fill", colors(d));
                     d3.select(".text"+d)
                         .style("fill", "black");
-
-                    /* Restores entries in the teammates chart
-                    cmpSvg.selectAll("[class^=rect1]")
-                        .style("opacity", function() {
-                            if (d3.select(this).attr("id") == d) {
-                                var teammate = d3.select(this).attr("class").substring(10, d3.select(this).attr("class").length);
-                                console.log(teammate);
-                                d3.select(".rect"+teammate)
-                                    .style("fill", colorsTeammates(teammate));
-                                d3.select(".text"+teammate)
-                                    .style("fill", "black");
-                                if (teammatesDisabled.includes(teammate)) {
-                                    index = teammatesDisabled.indexOf(teammate);
-                                    teammatesDisabled.splice(index, 1);
-                                }
-                                return d3.select(this).style("opacity");
-                            }
-                            return d3.select(this).style("opacity");
-                        }); */
                 }
                 
                 // Refresh the data in the charts
@@ -989,6 +957,7 @@
                 plotDNF(data, minYearSelectedDNF, maxYearSelectedDNF, selectedTrackDNF);
                 drawConsistencyTimeSlider(data);
                 plotConsistency(data, minYearSelectedCons, maxYearSelectedCons, selectedTrackCons);
+                plotPCA(data, data2);
             });          
     }
     
@@ -1351,7 +1320,7 @@
                 return "rect"+d;
             })
 			.style("fill", function(d){
-                if (teammatesShowing.includes(d)) {
+                if (!teammatesDisabled.includes(d)) {
                     return colorsTeammates(d);
                 }
                 return "grey";
@@ -1367,7 +1336,7 @@
             .attr("dy", ".35em")
             .style("font", "12px times")
             .style("fill", function(d) {
-                if (teammatesShowing.includes(d)) {
+                if (!teammatesDisabled.includes(d)) {
                     return "black";
                 }
                 return "grey";
@@ -1381,9 +1350,9 @@
             .on("mouseover", function(d) {
                 // Highlights the entry in the legend and outlines the right bars
                 document.body.style.cursor = "pointer";
-                d3.select(".rect"+d)
+                d3.selectAll(".rect"+d)
                     .attr("stroke", "black");
-                d3.select(".text"+d)
+                d3.selectAll(".text"+d)
                     .attr("text-decoration", "underline overline");    
 
                 if (d == selectedDriver) {
@@ -1396,16 +1365,40 @@
                     cmpSvg.selectAll("[class^=rect1][class$=" + d + "]")
                         .style("stroke", "black");
                 }
+                
+                // Highlights the right point in the PCA chart
+                simSvg.select("."+d)
+                        .attr("r", 8);
+                currentDriverAchievements = [];
+                for (i = 0; i < achievements.length; i++) {
+                    if (achievements[i].driver == d) {
+                        currentDriverAchievements = achievements[i];
+                    }
+                }
+                labelAchievements.innerHTML = "<b>"+d.replace(/_/g, ' ')+"</b><br>";
+                labelAchievements.innerHTML += "Points: " + currentDriverAchievements.points + " - Starts: " + currentDriverAchievements.starts + " - Finishes: " + currentDriverAchievements.finishes + " - Podiums: " + currentDriverAchievements.podiums + "<br>";
+                labelAchievements.innerHTML += "Wins: " + currentDriverAchievements.wins + " - Poles: " + currentDriverAchievements.poles + " - Championships " + currentDriverAchievements.championships;
             })
             .on("mouseout", function(d) {
                 // Restores everything
                 document.body.style.cursor = "default";
-                d3.select(".rect"+d)
+                d3.selectAll(".rect"+d)
                     .attr("stroke", "none");
-                d3.select(".text"+d)
+                d3.selectAll(".text"+d)
                     .attr("text-decoration", "none");
                 cmpSvg.selectAll("[class^=rect]")
                     .style("stroke", "white")
+                    
+                simSvg.select("."+d)
+                        .attr("r", function() {
+                            if (notableDrivers.includes(d)) {
+                                return 6;
+                            }
+                            return 3;
+                       });
+                labelAchievements.innerHTML = "<b>No Driver Highlighted</b><br>";
+                labelAchievements.innerHTML += "Points: ? - Starts: ? - Finishes: ? - Podiums: ? <br>";
+                labelAchievements.innerHTML += "Wins: ? - Poles: ? - Championships ?";
             })
             .on("click", function(d) {
                 if (!teammatesDisabled.includes(d)) {
@@ -1420,9 +1413,9 @@
                     teammatesDisabled.push(d);
                     
                     // Disables the entry in the constructor legend
-                    d3.select(".rect"+d)
+                    d3.selectAll(".rect"+d)
                         .style("fill", "grey");
-                    d3.select(".text"+d)
+                    d3.selectAll(".text"+d)
                         .style("fill", "grey");
                 }
                 else {
@@ -1431,13 +1424,14 @@
                     lastTeammateEnabled = d;
                     
                     // Restores the entry in the legend
-                    d3.select(".rect"+d)
+                    d3.selectAll(".rect"+d)
                         .style("fill", colorsTeammates(d));
-                    d3.select(".text"+d)
+                    d3.selectAll(".text"+d)
                         .style("fill", "black");
                }
                var lastConstructorsDisabledSize = constructorsDisabled.length;
                plotComparisons(data, data2);
+               plotPCA(data, data2);
                if (constructorsDisabled.length != lastConstructorsDisabledSize) {
                     plotPointsAchieved(data, data2);
                     maxValueDNF = 0;
@@ -2081,7 +2075,7 @@
         simSvg.selectAll('*').remove();
         
         // Gets PCA values of the selected driver
-        var notableDrivers = [selectedDriver];
+        notableDrivers = [selectedDriver];
         relevantData = [];
         pca1 = 0;
         pca2 = 0;
@@ -2119,9 +2113,11 @@
                     }
                 }
                 if (!chosenIndexes.includes(index)) {
-                    relevantData.push(PCAdata[index]);
                     notableDrivers.push(PCAdata[index].driver);
                     chosenIndexes.push(index);
+                    if (!teammatesDisabled.includes(PCAdata[index].driver)) {
+                        relevantData.push(PCAdata[index]);
+                    }     
                 } 
                 counter += 1;
                 maxCloseness = 30;
@@ -2130,40 +2126,34 @@
         }
         // Finds the the PC values of the teammates
         else if (PCAmode == 3) {
+            notableDrivers = teammates;
             for (i = 0; i < PCAdata.length; i++) {
-                if (PCAdata[i].driver != selectedDriver && teammates.includes(PCAdata[i].driver)) {
+                if (PCAdata[i].driver != selectedDriver && teammates.includes(PCAdata[i].driver) && !teammatesDisabled.includes(PCAdata[i].driver)) {
                     relevantData.push(PCAdata[i]);
-                    notableDrivers.push(PCAdata[i].driver);
                 }
             }
         }   
-
-        // Initializes the PCA1 and PCA2 scales
-        if (PCAmode != 0) {
-            pca1Scale = d3.scaleLinear()
-                .domain(d3.extent(relevantData, function(d) {
-                    return d.pca1;
-                }))
-                .range([0, small_chart_dimensions.width-110]);
-            pca2Scale = d3.scaleLinear()
-                .domain(d3.extent(relevantData, function(d) {
-                    return d.pca2;
-                }).reverse())
-                .range([0, 200]);
-        }
         else {
-            pca1Scale = d3.scaleLinear()
-                .domain(d3.extent(PCAdata, function(d) {
-                    return d.pca1;
-                }))
-                .range([0, small_chart_dimensions.width-110]);
-            pca2Scale = d3.scaleLinear()
-                .domain(d3.extent(PCAdata, function(d) {
-                    return d.pca2;
-                }).reverse())
-                .range([0, 200]);
+            for (i = 0; i < PCAdata.length; i++) {
+                if (PCAdata[i].driver != selectedDriver && !teammatesDisabled.includes(PCAdata[i].driver)) {
+                    relevantData.push(PCAdata[i]);
+                }
+            }
             notableDrivers.push("Other");
         }
+
+        // Initializes the PCA1 and PCA2 scales
+        pca1Scale = d3.scaleLinear()
+            .domain(d3.extent(relevantData, function(d) {
+                return d.pca1;
+            }))
+            .range([0, small_chart_dimensions.width-110]);
+        pca2Scale = d3.scaleLinear()
+            .domain(d3.extent(relevantData, function(d) {
+                return d.pca2;
+            }).reverse())
+            .range([0, 200]);
+       
                
         // Initializes the axis
         pca1Axis = d3.axisBottom(pca1Scale).ticks(0);
@@ -2197,7 +2187,7 @@
  
         // Plot the circles
         circles = simSvg.selectAll("mycircle")
-            .data(PCAdata)
+            .data(relevantData)
             .enter()
             .append("circle")
                 .attr("class", function(d) {
@@ -2215,12 +2205,6 @@
                     }
                     return 6;
                 })
-                .style("opacity", function(d) {
-                    if (!notableDrivers.includes(d.driver) && PCAmode != 0) {
-                        return 0;
-                    }
-                    return 1;
-                })
                 .style("fill", function(d) {
                     if (!notableDrivers.includes(d.driver)) {  
                         return "orange";
@@ -2230,6 +2214,7 @@
                 .style("stroke", "black");
         
         circles.on("mouseover", function(d) {
+            // Highligths circle and update stats
             if (d3.select(this).attr("r") == 6) {
                 d3.select(this).attr("r", 8);
             }
@@ -2245,9 +2230,22 @@
             labelAchievements.innerHTML = "<b>"+d.driver.replace(/_/g, ' ')+"</b><br>";
             labelAchievements.innerHTML += "Points: " + currentDriverAchievements.points + " - Starts: " + currentDriverAchievements.starts + " - Finishes: " + currentDriverAchievements.finishes + " - Podiums: " + currentDriverAchievements.podiums + "<br>";
             labelAchievements.innerHTML += "Wins: " + currentDriverAchievements.wins + " - Poles: " + currentDriverAchievements.poles + " - Championships " + currentDriverAchievements.championships;
+            
+            // Highlights the right bars in the teammate chart
+            if (d.driver == selectedDriver) {
+                cmpSvg.selectAll("[class^=rect0]")
+                    .style("stroke", "black");
+            }
+            else {
+                cmpSvg.selectAll("[class^=rect0][class$=" + d.driver + "]")
+                    .style("stroke", "black");
+                cmpSvg.selectAll("[class^=rect1][class$=" + d.driver + "]")
+                    .style("stroke", "black");
+            }
         });
         
         circles.on("mouseout", function(d) {
+            // Restores everything
             if (d3.select(this).attr("r") == 8) {
                 d3.select(this).attr("r", 6);
             }
@@ -2257,6 +2255,10 @@
             labelAchievements.innerHTML = "<b>No Driver Highlighted</b><br>";
             labelAchievements.innerHTML += "Points: ? - Starts: ? - Finishes: ? - Podiums: ? <br>";
             labelAchievements.innerHTML += "Wins: ? - Poles: ? - Championships ?";
+            
+            // Restores everything in the teammate chart
+            cmpSvg.selectAll("[class^=rect]")
+                .style("stroke", "white");
         });
         
         circles.on("click", function(d) {
@@ -2302,6 +2304,9 @@
                 if (d == "Other") {
                     return "orange";
                 }
+                if (teammatesDisabled.includes(d)) {
+                    return "grey";
+                }
                 return colorsTeammates(d);
 			});
             
@@ -2314,6 +2319,12 @@
             .attr("y", sizeSquare/2)
             .attr("dy", ".35em")
             .style("font", "12px times")
+            .style("fill", function(d) {
+                if (teammatesDisabled.includes(d)) {
+                    return "grey";
+                }
+                return "black";
+            })    
             .text(function(d) {
                 return d.replace(/_/g, ' ');
             });
@@ -2325,12 +2336,11 @@
                 if (d == "Other") {
                     return;
                 }
-                if (allDrivers.includes(d)) {
-                    svgSimLegend.select(".rect"+d)
-                        .attr("stroke", "black");
-                    svgSimLegend.select(".text"+d)
-                        .attr("text-decoration", "underline overline");    
-                }
+                d3.selectAll(".rect"+d)
+                    .attr("stroke", "black");
+                d3.selectAll(".text"+d)
+                    .attr("text-decoration", "underline overline");    
+                    
                 simSvg.select("."+d)
                         .attr("r", 8);
                 currentDriverAchievements = [];
@@ -2342,18 +2352,34 @@
                 labelAchievements.innerHTML = "<b>"+d.replace(/_/g, ' ')+"</b><br>";
                 labelAchievements.innerHTML += "Points: " + currentDriverAchievements.points + " - Starts: " + currentDriverAchievements.starts + " - Finishes: " + currentDriverAchievements.finishes + " - Podiums: " + currentDriverAchievements.podiums + "<br>";
                 labelAchievements.innerHTML += "Wins: " + currentDriverAchievements.wins + " - Poles: " + currentDriverAchievements.poles + " - Championships " + currentDriverAchievements.championships;
+                
+                // Highlights the right bars in the teammate chart
+                if (d == selectedDriver) {
+                    cmpSvg.selectAll("[class^=rect0]")
+                        .style("stroke", "black");
+                }
+                else {
+                    cmpSvg.selectAll("[class^=rect0][class$=" + d + "]")
+                        .style("stroke", "black");
+                    cmpSvg.selectAll("[class^=rect1][class$=" + d + "]")
+                        .style("stroke", "black");
+                }
             })
             .on("mouseout", function(d) {
                 // Restores everything
-                svgSimLegend.select(".rect"+d)
+                d3.selectAll(".rect"+d)
                     .attr("stroke", "none");
-                svgSimLegend.select(".text"+d)
+                d3.selectAll(".text"+d)
                     .attr("text-decoration", "none");
                 simSvg.select("."+d)
                     .attr("r", 6);
                 labelAchievements.innerHTML = "<b>No Driver Highlighted</b><br>";
                 labelAchievements.innerHTML += "Points: ? - Starts: ? - Finishes: ? - Podiums: ? <br>";
                 labelAchievements.innerHTML += "Wins: ? - Poles: ? - Championships ?";
+                
+                // Restores everything in the teammate chart
+                cmpSvg.selectAll("[class^=rect]")
+                    .style("stroke", "white");
             })
             .on("click", function(d) {
                 if (allDrivers.includes(d)) {
