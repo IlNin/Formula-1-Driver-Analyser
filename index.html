@@ -86,7 +86,7 @@
     
     // DEBUG
     var showTitleImage = 1;
-    var animationsSpeed = 1000;
+    var animationsSpeed = 1; // 1: No animations, 1000: default
     
     // Draws the title screen above the charts
     function drawTitle() {
@@ -186,6 +186,7 @@
                     data2.forEach(function(d) { // Cycles through the qualifying data
                         d.surname = d.surname.replace(/[\s.']/g, '_'); // Removes eventual spaces in the surnames
                         d.name = d.name.replace(/[\s.']/g, '_'); // Removes eventual spaces in the names
+                        d.constructor = d.constructor.replace(/[\s.']/g, '_');
                     });
                     
                     data3.forEach(function(d) { 
@@ -2213,7 +2214,13 @@
                     }
                     return colorsTeammates(d.driver);
                 })
+                .style("opacity", 0)
                 .style("stroke", "black");
+        
+        circles
+            .transition()
+                .duration(animationsSpeed)
+                .style("opacity", 1);
         
         circles.on("mouseover", function(d) {
             // Highligths circle and update stats
@@ -2261,13 +2268,6 @@
             // Restores everything in the teammate chart
             cmpSvg.selectAll("[class^=rect]")
                 .style("stroke", "white");
-        });
-        
-        circles.on("click", function(d) {
-            if (allDrivers.includes(d.driver)) {
-                selectedDriver = d.driver;
-                initializeChartsLayout(data, data2);
-            }
         });
         
         // Draws the legend
