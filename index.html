@@ -75,6 +75,8 @@
     var lastTeammateEnabled = ""; // The last teammate that the user has enabled
     var notableDrivers = []; // List of drivers that are featured in the PCA
     var driversDisabled = []; // List of drivers that are disabled in the top 5/10 of the PCA
+    
+    var driversHovered = [];
 
     // Avg line parameters
     var barsClicked = []; // List of bars clicked in the total points chart
@@ -418,6 +420,8 @@
         lastTeammateEnabled = "";
         driversDisabled = [];
         
+        driversHovered = [];
+        
         selectedTrackDNF = 0;
         minYearSelectedDNF = 0;
         maxYearSelectedDNF = 0;
@@ -452,7 +456,7 @@
         var driverSelectedDiv = document.createElement('div');
         driverSelectedDiv.id = "selecteddriver";
         driverSelectedDiv.innerHTML = "<b>- " + selectedDriver.replace(/_/g, ' ') + " -</b><br>";
-        driverSelectedDiv.innerHTML += "<i>Points: </i>" + points + " --- <i>Starts: </i>" + starts + " --- <i>Finishes: </i>" + finishes + " --- <i>Podiums: </i>" + podiums + " --- <i>Wins: </i>" + wins + " --- <i>Poles: </i>" + poles + " --- <i>Championships: </i>" + championships;
+        driverSelectedDiv.innerHTML += "<b><i>Points: </i></b>" + points + " --- <b><i>Starts: </i></b>" + starts + " --- <b><i>Finishes: </i></b>" + finishes + " --- <b><i>Podiums: </i></b>" + podiums + " --- <b><i>Wins: </i></b>" + wins + " --- <b><i>Poles: </i></b>" + poles + " --- <b><i>Championships: </i></b>" + championships;
         if (years.length > 0) {
             driverSelectedDiv.innerHTML += " [";
             for (i = 0; i < years.length-1; i++) {
@@ -907,8 +911,14 @@
                     cmpSvg.selectAll("[class^=rect]")
                         .style("stroke", function() {
                             if (d3.select(this).attr("id") == d) {
+                                hoveredDriver = d3.select(this).attr("class").substring(10, d3.select(this).attr("class").length);
+                                if (!driversHovered.includes(hoveredDriver)) {
+                                    driversHovered.push(hoveredDriver);
+                                }
+                                console.log(driversHovered);
                                 return "black";
                             }
+                            
                             return d3.select(this).style("stroke");
                         }); 
                 }
@@ -926,12 +936,17 @@
                     cmpSvg.selectAll("[class^=rect]")
                         .style("stroke", "white");
                 }
+                driversHovered = [];
             })
             .on("click", function(d) {
                 // Hides the data regarding that constructor in all the charts
                 if (!constructorsDisabled.includes(d)) {
                     if (constructorsDisabled.length == constructors.length-1) {
                         alert("Can't remove all constructors!");
+                        return;
+                    }
+                    if ((driversHovered.length + teammatesDisabled.length) == teammates.length-1) {
+                        alert("Removing this constructor may remove all teammates!");
                         return;
                     }
                     constructorsDisabled.push(d);
@@ -1382,6 +1397,9 @@
                 }
                 
                 // Highlights the right point in the PCA chart
+                if (!allDrivers.includes(d)) {
+                    return;
+                }
                 simSvg.select("."+d)
                         .attr("r", 8);
                 currentDriverAchievements = [];
@@ -2141,7 +2159,12 @@
         }
         // Finds the the PC values of the teammates
         else if (PCAmode == 3) {
-            notableDrivers = teammates;
+            notableDrivers = teammates.slice();
+            for (i = 0; i < notableDrivers.length; i++) {
+                if (!allDrivers.includes(notableDrivers[i])) {
+                    notableDrivers.splice(i, 1);
+                 }
+            }      
             for (i = 0; i < PCAdata.length; i++) {
                 if (PCAdata[i].driver != selectedDriver && teammates.includes(PCAdata[i].driver) && !teammatesDisabled.includes(PCAdata[i].driver)) {
                     relevantData.push(PCAdata[i]);
