@@ -841,6 +841,11 @@
         // Erase previous data
         svgLegend.selectAll('*').remove();
         
+        svgLegend.append("text")
+            .style("font", "12px times")
+            .attr("y", 5)
+            .text("Click to filter data!");
+        
         // Prepares the space/layout for the legend
         sizeSquare = 10;
         legend = svgLegend.selectAll("legend")
@@ -849,7 +854,7 @@
             .append("g")
             .attr("class", "legend")
 			.attr("transform", function(d,i){
-                return "translate(0,"+(i*sizeSquare+i*5)+")";
+                return "translate(0,"+((i+1)*sizeSquare+i*5)+")";
             });
         
         // Draws the small colored rectangles
@@ -872,7 +877,7 @@
                 return "text"+d;
             })
             .attr("x", sizeSquare+5)
-            .attr("y", sizeSquare/2)
+            .attr("y", (sizeSquare/2))
             .attr("dy", ".35em")
             .style("font", "12px times")
             .style("fill", function(d) {
@@ -884,6 +889,8 @@
             .text(function(d) {
                 return d.replace(/_/g, ' ');
             });
+        
+         
             
         // Add input events to the legend
         legend
@@ -1299,9 +1306,14 @@
         // Erase previous data
         svgCmpLegend.selectAll('*').remove();
         
+        svgCmpLegend.append("text")
+            .style("font", "12px times")
+            .attr("y", 5)
+            .text("Click to filter data!");
+        
         // Resize the legend if there too many entries
         if (teammates.length > 15) {
-            d3.select(".svgCmp").attr("height", teammates.length*sizeSquare*1.5);
+            d3.select(".svgCmp").attr("height", (teammates.length*sizeSquare*1.5)+10);
         }
         
         // Prepares the space/layout for the legend
@@ -1312,7 +1324,7 @@
             .append("g")
             .attr("class", "legend")
 			.attr("transform", function(d,i){
-                return "translate(0,"+(i*sizeSquare+i*5)+")";
+                return "translate(0,"+((i+1)*sizeSquare+i*5)+")";
             });
         
         // Draws the small colored rectangles
@@ -2279,9 +2291,14 @@
         // Erase previous data
         svgSimLegend.selectAll('*').remove();
         
+        svgSimLegend.append("text")
+            .style("font", "12px times")
+            .attr("y", 5)
+            .text("Click to filter data!");
+        
          // Resize the legend if there too many entries
         if (teammates.length > 11) {
-            d3.select(".svgSim").attr("height", teammates.length*sizeSquare*1.5);
+            d3.select(".svgSim").attr("height", (teammates.length*sizeSquare*1.5)+10);
         }
         
         // Prepares the space/layout for the legend
@@ -2292,7 +2309,7 @@
             .append("g")
             .attr("class", "legend")
 			.attr("transform", function(d,i){
-                return "translate(0,"+(i*sizeSquare+i*5)+")";
+                return "translate(0,"+((i+1)*sizeSquare+i*5)+")";
             });
         
         // Draws the small colored rectangles
