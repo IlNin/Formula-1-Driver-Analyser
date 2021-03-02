@@ -2170,7 +2170,7 @@
                 .duration(animationsSpeed)
                 .style("opacity", 1);
         
-        /* Place the point of the selected driver again on the graph, so that it stands out
+        // Place the point of the selected driver again on the graph, so that it stands out
         if (PCAmode == 0) {
             simSvg
                 .append("circle")
@@ -2180,9 +2180,13 @@
                     .attr("r", 6)
                     .style("fill", colorsTeammates(selectedDriver))
                     .style("stroke", "black")
-                    .on("mouseover", onMouseOverDriver(selectedDriver))
-                    .on("mouseout", onMouseOutDriver(selectedDriver));
-        } */
+                    .on("mouseover", function() {
+                        onMouseOverDriver(selectedDriver);
+                    })
+                    .on("mouseout", function() {
+                        onMouseOutDriver(selectedDriver);
+                    });   
+        } 
         
         // Interactions
         circles.on("mouseover", function(d) {
