@@ -899,15 +899,19 @@
         // Add input events to the legend
         legend
             .on("mouseover", function(d) {
-                // Highlights the entry in the legend and outlines the right bars, both in the points and teammates charts
+                // Highlights the entry in the legend
                 document.body.style.cursor = "pointer";
                 d3.select(".rect"+d)
                     .attr("stroke", "black");
                 d3.select(".text"+d)
                     .attr("text-decoration", "underline overline");
+                
+                // Highlights the bars
                 if (nBarsClicked == 0) {
+                    // First in the points chart
                     barSvg.selectAll("[class*=" + d + "]")
                         .style("stroke", "black"); 
+                    // Then in the teammates chart
                     cmpSvg.selectAll("[class^=rect]")
                         .style("stroke", function() {
                             if (d3.select(this).attr("id") == d) {
@@ -915,7 +919,6 @@
                                 if (!driversHovered.includes(hoveredDriver)) {
                                     driversHovered.push(hoveredDriver);
                                 }
-                                console.log(driversHovered);
                                 return "black";
                             }
                             
