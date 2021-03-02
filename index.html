@@ -295,7 +295,7 @@
                 'Access-Control-Allow-Origin':'*'
             }, */
             type: 'POST',
-            url: "http://127.0.0.1:5000/pca",
+            url: "https://formula-1-driver-analyser-pca.herokuapp.com/pca",
             data: JSON.stringify({value: achievements}),
             crossDomain: true,
             success: function (response) {
@@ -1377,61 +1377,13 @@
         
         // Add input events to the legend
         legend
-            .on("mouseover", function(d) {
-                // Highlights the entry in the legend and outlines the right bars
+            .on("mouseover", function(d) {   
                 document.body.style.cursor = "pointer";
-                d3.selectAll(".rect"+d)
-                    .attr("stroke", "black");
-                d3.selectAll(".text"+d)
-                    .attr("text-decoration", "underline overline");    
-
-                if (d == selectedDriver) {
-                    cmpSvg.selectAll("[class^=rect0]")
-                        .style("stroke", "black");
-                }
-                else {
-                    cmpSvg.selectAll("[class^=rect0][class$=" + d + "]")
-                        .style("stroke", "black");
-                    cmpSvg.selectAll("[class^=rect1][class$=" + d + "]")
-                        .style("stroke", "black");
-                }
-                
-                // Highlights the right point in the PCA chart
-                if (!allDrivers.includes(d)) {
-                    return;
-                }
-                simSvg.select("."+d)
-                        .attr("r", 8);
-                currentDriverAchievements = [];
-                for (i = 0; i < achievements.length; i++) {
-                    if (achievements[i].driver == d) {
-                        currentDriverAchievements = achievements[i];
-                    }
-                }
-                labelAchievements.innerHTML = "<b>"+d.replace(/_/g, ' ')+"</b><br>";
-                labelAchievements.innerHTML += "Points: " + currentDriverAchievements.points + " - Starts: " + currentDriverAchievements.starts + " - Finishes: " + currentDriverAchievements.finishes + " - Podiums: " + currentDriverAchievements.podiums + "<br>";
-                labelAchievements.innerHTML += "Wins: " + currentDriverAchievements.wins + " - Poles: " + currentDriverAchievements.poles + " - Championships " + currentDriverAchievements.championships;
+                onMouseOverDriver(d); 
             })
             .on("mouseout", function(d) {
-                // Restores everything
                 document.body.style.cursor = "default";
-                d3.selectAll(".rect"+d)
-                    .attr("stroke", "none");
-                d3.selectAll(".text"+d)
-                    .attr("text-decoration", "none");
-                cmpSvg.selectAll("[class^=rect]")
-                    .style("stroke", "white")
-                    
-                simSvg.select("."+d)
-                        .attr("r", function() {
-                            if (notableDrivers.includes(d)) {
-                                return 6;
-                            }
-                            return 3;
-                       });
-                labelAchievements.innerHTML = "<b>No Driver Highlighted</b><br>";
-                labelAchievements.innerHTML += "Points: ? - Starts: ? - Finishes: ? - Podiums: ? <br>";
-                labelAchievements.innerHTML += "Wins: ? - Poles: ? - Championships ?";
+                onMouseOutDriver(d);
             })
             .on("click", function(d) {
                 if (!teammatesDisabled.includes(d)) {
@@ -2017,7 +1969,7 @@
             .append('svg')
                 .attr("width", legend_width)
                 .attr("height", small_container_dimensions.height-30)
-                .attr("class", ".svgSim")
+                .attr("class", "svgSim")
                 //.style("background-color", "red")
                 .append("g")
                     .attr("transform", "translate(" + 0 + "," + margins.top/4 + ")")
@@ -2251,59 +2203,34 @@
                 })
                 .style("opacity", 0)
                 .style("stroke", "black");
-        
+                
         circles
             .transition()
                 .duration(animationsSpeed)
                 .style("opacity", 1);
         
+        /* Place the point of the selected driver again on the graph, so that it stands out
+        if (PCAmode == 0) {
+            simSvg
+                .append("circle")
+                    .attr("class", selectedDriver)
+                    .attr("cx", pca1Scale(pca1))
+                    .attr("cy", pca2Scale(pca2))
+                    .attr("r", 6)
+                    .style("fill", colorsTeammates(selectedDriver))
+                    .style("stroke", "black")
+                    .on("mouseover", onMouseOverDriver(selectedDriver))
+                    .on("mouseout", onMouseOutDriver(selectedDriver));
+        } */
+        
+        // Interactions
         circles.on("mouseover", function(d) {
-            // Highligths circle and update stats
-            if (d3.select(this).attr("r") == 6) {
-                d3.select(this).attr("r", 8);
-            }
-            else {
-                d3.select(this).attr("r", 5);
-            }
-            var currentDriverAchievements = [];
-            for (i = 0; i < achievements.length; i++) {
-                if (achievements[i].driver == d.driver) {
-                    currentDriverAchievements = achievements[i];
-                }
-            }
-            labelAchievements.innerHTML = "<b>"+d.driver.replace(/_/g, ' ')+"</b><br>";
-            labelAchievements.innerHTML += "Points: " + currentDriverAchievements.points + " - Starts: " + currentDriverAchievements.starts + " - Finishes: " + currentDriverAchievements.finishes + " - Podiums: " + currentDriverAchievements.podiums + "<br>";
-            labelAchievements.innerHTML += "Wins: " + currentDriverAchievements.wins + " - Poles: " + currentDriverAchievements.poles + " - Championships " + currentDriverAchievements.championships;
-            
-            // Highlights the right bars in the teammate chart
-            if (d.driver == selectedDriver) {
-                cmpSvg.selectAll("[class^=rect0]")
-                    .style("stroke", "black");
-            }
-            else {
-                cmpSvg.selectAll("[class^=rect0][class$=" + d.driver + "]")
-                    .style("stroke", "black");
-                cmpSvg.selectAll("[class^=rect1][class$=" + d.driver + "]")
-                    .style("stroke", "black");
-            }
+            onMouseOverDriver(d.driver);
         });
         
         circles.on("mouseout", function(d) {
-            // Restores everything
-            if (d3.select(this).attr("r") == 8) {
-                d3.select(this).attr("r", 6);
-            }
-            else {
-                d3.select(this).attr("r", 3);
-            }
-            labelAchievements.innerHTML = "<b>No Driver Highlighted</b><br>";
-            labelAchievements.innerHTML += "Points: ? - Starts: ? - Finishes: ? - Podiums: ? <br>";
-            labelAchievements.innerHTML += "Wins: ? - Poles: ? - Championships ?";
-            
-            // Restores everything in the teammate chart
-            cmpSvg.selectAll("[class^=rect]")
-                .style("stroke", "white");
-        });
+            onMouseOutDriver(d.driver);
+        }); 
         
         // Draws the legend
         plotPCALegend(data, data2, notableDrivers);
@@ -2320,8 +2247,11 @@
             .text("Click to filter data!");
         
          // Resize the legend if there too many entries
-        if (teammates.length > 11) {
-            d3.select(".svgSim").attr("height", (teammates.length*sizeSquare*1.5)+10);
+        if (notableDrivers.length > 11) {
+            d3.select(".svgSim").attr("height", (notableDrivers.length*sizeSquare*1.5)+10);
+        }
+        else {
+            d3.select(".svgSim").attr("height", small_container_dimensions.height-30);
         }
         
         // Prepares the space/layout for the legend
@@ -2374,56 +2304,15 @@
         // Add input events to the legend
         legend
             .on("mouseover", function(d) {
-                document.body.style.cursor = "pointer";
-                // Highlights the entry in the legend and outlines the right bars
                 if (d == "Other") {
                     return;
-                }
-                d3.selectAll(".rect"+d)
-                    .attr("stroke", "black");
-                d3.selectAll(".text"+d)
-                    .attr("text-decoration", "underline overline");    
-                    
-                simSvg.select("."+d)
-                        .attr("r", 8);
-                currentDriverAchievements = [];
-                for (i = 0; i < achievements.length; i++) {
-                    if (achievements[i].driver == d) {
-                        currentDriverAchievements = achievements[i];
-                    }
-                }
-                labelAchievements.innerHTML = "<b>"+d.replace(/_/g, ' ')+"</b><br>";
-                labelAchievements.innerHTML += "Points: " + currentDriverAchievements.points + " - Starts: " + currentDriverAchievements.starts + " - Finishes: " + currentDriverAchievements.finishes + " - Podiums: " + currentDriverAchievements.podiums + "<br>";
-                labelAchievements.innerHTML += "Wins: " + currentDriverAchievements.wins + " - Poles: " + currentDriverAchievements.poles + " - Championships " + currentDriverAchievements.championships;
-                
-                // Highlights the right bars in the teammate chart
-                if (d == selectedDriver) {
-                    cmpSvg.selectAll("[class^=rect0]")
-                        .style("stroke", "black");
-                }
-                else {
-                    cmpSvg.selectAll("[class^=rect0][class$=" + d + "]")
-                        .style("stroke", "black");
-                    cmpSvg.selectAll("[class^=rect1][class$=" + d + "]")
-                        .style("stroke", "black");
-                }
+                } 
+                document.body.style.cursor = "pointer";
+                onMouseOverDriver(d);
             })
             .on("mouseout", function(d) {
                 document.body.style.cursor = "default";
-                // Restores everything
-                d3.selectAll(".rect"+d)
-                    .attr("stroke", "none");
-                d3.selectAll(".text"+d)
-                    .attr("text-decoration", "none");
-                simSvg.select("."+d)
-                    .attr("r", 6);
-                labelAchievements.innerHTML = "<b>No Driver Highlighted</b><br>";
-                labelAchievements.innerHTML += "Points: ? - Starts: ? - Finishes: ? - Podiums: ? <br>";
-                labelAchievements.innerHTML += "Wins: ? - Poles: ? - Championships ?";
-                
-                // Restores everything in the teammate chart
-                cmpSvg.selectAll("[class^=rect]")
-                    .style("stroke", "white");
+                onMouseOutDriver(d);
             })
             .on("click", function(d) {
                 if (d == "Other") {
@@ -2502,6 +2391,70 @@
             });
     }
     
+    // Actions to take when the user hovers over a driver
+    function onMouseOverDriver(driver) {
+        // Highlights the entries in the legends
+        d3.selectAll(".rect" + driver)
+            .attr("stroke", "black");
+        d3.selectAll(".text" + driver)
+            .attr("text-decoration", "underline overline");
+        
+        // Highligths circle and updates stats
+        if (d3.select("." + driver).attr("r") == 6) {
+            d3.select("." + driver).attr("r", 8);
+        }
+        else {
+            d3.select("." + driver).attr("r", 5);
+        }
+        var currentDriverAchievements = [];
+        for (i = 0; i < achievements.length; i++) {
+            if (achievements[i].driver == driver) {
+                currentDriverAchievements = achievements[i];
+            }
+        }
+        if (allDrivers.includes(driver)) {
+            labelAchievements.innerHTML = "<b> "+ driver.replace(/_/g, ' ') + "</b><br>";
+            labelAchievements.innerHTML += "Points: " + currentDriverAchievements.points + " - Starts: " + currentDriverAchievements.starts + " - Finishes: " + currentDriverAchievements.finishes + " - Podiums: " + currentDriverAchievements.podiums + "<br>";
+            labelAchievements.innerHTML += "Wins: " + currentDriverAchievements.wins + " - Poles: " + currentDriverAchievements.poles + " - Championships " + currentDriverAchievements.championships;
+        }
+        
+        // Highlights the right bars in the teammate chart
+        if (driver == selectedDriver) {
+            cmpSvg.selectAll("[class^=rect0]")
+                .style("stroke", "black");
+        }
+        else {
+            cmpSvg.selectAll("[class^=rect0][class$=" + driver + "]")
+                .style("stroke", "black");
+            cmpSvg.selectAll("[class^=rect1][class$=" + driver + "]")
+                .style("stroke", "black");
+        }
+    }
+    
+    // Actions to take when the user stops hovering over a driver
+    function onMouseOutDriver(driver) {
+        // Restores the entries in the legend
+        d3.selectAll(".rect"+ driver)
+            .attr("stroke", "none");
+        d3.selectAll(".text" + driver)
+            .attr("text-decoration", "none");
+            
+        // Restores everything in the PCA chart
+        if (d3.select("." + driver).attr("r") == 8) {
+            d3.select("." + driver).attr("r", 6);
+        }
+        else {
+            d3.select("." + driver).attr("r", 3);
+        }
+        labelAchievements.innerHTML = "<b>No Driver Highlighted</b><br>";
+        labelAchievements.innerHTML += "Points: ? - Starts: ? - Finishes: ? - Podiums: ? <br>";
+        labelAchievements.innerHTML += "Wins: ? - Poles: ? - Championships ?";
+            
+        // Restores everything in the teammate chart
+        cmpSvg.selectAll("[class^=rect]")
+            .style("stroke", "white");
+    }
+         
     // Adds the list of tracks to a selection
     function addCircuitsToSelection(selection) {
         // Reorder the circuits
