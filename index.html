@@ -1,2921 +1,881 @@
 <!DOCTYPE html>
 <html>
     <head>
-        <meta http-equiv="content-type" content="text/html;charset=utf-8">
-        <title>Formula 1 Driver Analyser</title>
-        <script type="text/javascript" src="d3.js" charset="utf-8"></script>
-        <script src="https://unpkg.com/d3-simple-slider"></script>
-        <script type="text/javascript" src="https://code.jquery.com/jquery-2.1.4.min.js"></script>  
-        <script src="https://cdn.socket.io/socket.io-1.0.0.js"></script>
+        <meta charset=utf-8>
+        <title>Formula Driver - Menu</title>
+        <style>
+            body { margin: 0; }
+            canvas { width: 100%; height: 100% }
+        </style>
+        <link href='https://fonts.googleapis.com/css?family=Noto Serif' rel='stylesheet'>
         <link rel="stylesheet" type="text/css" href="style.css"/>
-	</head>
+    </head>
     
     <body>
-    <div id="dialog" title="Basic dialog"></div>
-    <script charset="utf-8">  
-    // Dimensions
-    var margins = {top: 20, right: 10, bottom: 40, left: 45};
-    var container_dimensions = {width: 551, height: 240}; 
-    var chart_dimensions = {
-        width: container_dimensions.width - margins.left - margins.right,
-        height: container_dimensions.height - margins.top - margins.bottom
-    };
-    var small_container_dimensions = {width: 446, height: 210};
-    var small_chart_dimensions = {
-        width: small_container_dimensions.width - margins.left - (margins.right + 30),
-        height: small_container_dimensions.height - margins.top - margins.bottom
-    };
-    var barSize = 30;
-    var legend_width = 119;
-    var timeslider_height = 55;
-    
-    // Divs, elements and svgs
-    var aboveWrapper, wrapper, bottomWrapper;
-    var driversTimeSliderSvg;
-    var barSvg, svgLegend;
-    var cmpSvg, svgCmpLegend;
-    var dnfTimeSliderSvg, dnfSvg, labelTotalRacesDNF;
-    var consTimeSliderSvg, consSvg, labelTotalRacesCons;
-    var simSvg, svgSimLegend, labelAchievements;
-    
-    // Colors
-    var colors = d3.scaleOrdinal(d3.schemeCategory20);
-    var colorsTeammates = d3.scaleOrdinal(d3.schemeCategory20);
-    
-    // User inputs
-    var showTotalPoints = true; // Flag that indicates to show the total points instead of the average per race
-    var showWinsInRaces = true; // Flag that indicates to show the wins in races instead of qualifying
-    
-    var selectedTrackDNF = 0;
-    var minYearSelectedDNF = 0;
-    var maxYearSelectedDNF = 0;
-    
-    var selectedTrackCons = 0;
-    var minYearSelectedCons = 0;
-    var maxYearSelectedCons = 0;
-    
-    var PCAmode = 0; // 0: Show Everyone; 1: Show Top 5
-    
-    // Drivers data
-    var allDrivers = []; // List of drivers loaded by the data
-    var drivers = []; // List of drivers for the selection, which depends on the years selected by the user
-    var achievements = []; // List of tuples that contain the achievements for each driver
-    var PCAdata = []; // List of the PCA components for each driver
-    var circuits = []; // List of tracks where the selected driver has driven
-    var flagAddCircuits = 0; // Flag that specify if the list of circuits needs to be added to the DNF/Consistency chart
-    var selectedDriver = ""; // Name of the current selected driver
-    var minYear; // Min year in which the driver has droven
-    var maxYear; // Max year in which the driver has droven
-    var constructors = []; // Keeps a list of constructors for which the driver has droven
-    var constructorsDisabled = []; // List of constructors which the driver drove for that the user is not interested in
-    var lastConstructorEnabled = ""; // The last constructor that the user has enabled
-    var teammates = []; // Keeps a list of the selected driver's teammates
-    var teammatesDisabled = []; // List of teammates that the user is not interested in
-    var teammatesShowing = []; // List of teammates that are actually showing on the chart
-    var lastTeammateEnabled = ""; // The last teammate that the user has enabled
-    var notableDrivers = []; // List of drivers that are featured in the PCA
-    var driversDisabled = []; // List of drivers that are disabled in the top 5/10 of the PCA
-    
-    var driversHovered = [];
+        <script src="js/three.js"></script>
+        <script src="js/OBJLoader.js"></script>
+        
+        <script>
+            // Global variables
+            var scene;
+            var camera;
+            var renderer;
+            var ambientLight;
+            var pointLight;
+            var pointLight2;
+            var loader;
+            var objects = new THREE.Group(); // The 3D models will be permanently saved here, without altering them, as a backup for when the game restarts
+            var models = new THREE.Group(); // It uses the same models as "objects", but we will change them during the course of the game
+            var loaded = false; // Indicates if the models have already been loaded
+            
+            var title; // Container with the title screens and the "Play", "Options" and "About" buttons
+            var playButton;
+            var optionsButton;
+            var aboutButton;
+            var options; // Container with the options
+            var easyButton;
+            var normalButton;
+            var hardButton;
+            var resolutionNativeButton;
+            var resolutionLowButton;
+            var shadowsOnButton;
+            var shadowsOffButton;
+            var fogOnButton;
+            var fogOffButton;
+            var ferrariButton;
+            var mercedesButton;
+            var redbullButton;
+            var optionsExitButton; // Button that closes the Option container
+            var about; // Container with the synopsis and commands
+            var aboutExitButton; // Button that closes the About container
+            var hud; // It shows the current score of the player
+            var gameOverScreen; // Screen that shows up when you crash
+            
+            var menuAnimation; // Timer for the menu animation
+            var gameplayAnimation; // Timer for the gameplay animation
+            var leftOrRight = 0; // The player turns their car to 0: neutral, 1: left, 2: right
+            var cockpit = true; // Type of camera view - true: cockpit view, false: third-person camera
+            var pause = false; // Indicates if the game is paused
+            var menu = true; // Indicates if the player is currently in the menu screen
+            
+            var maxSteering = 0.5; // How far the steering wheel can turn
+            var steering = 0.1; // How much the steering wheel turns at each frame
+            var carTurning = 0.02; // How much the car rotates when turning the wheel at each frame
+            var headTurning = 0.05; // How much the pilot's head rotates when turning the wheel at each frame
+            var tyreTurning = 0.03; // How much the car's tyres rotate when turning the wheel at each frame
+            var tyreSpeed = 0.05; // How fast the tyres move
+            var speed = 0.005; // The velocity of the car (aka how much the objects on the road move)
+            var spawnPoint = 0.5; // Coordinate X where the new objects on the road should spawn
+            
+            var collisionBoxPlayer;
+            var collisionBoxPlayerVisible;
+            var collisionOpponent;
+            var collisionOpponentVisible;
+            
+            var choosenDifficulty = 1.0; // 0.5: Easy, 1: Normal, 1.5: Hard. Choosen through the main menu
+            var difficulty = 1.0; // Actual difficulty during game. It increases every 50 passes.
+            var team = 0; //0: Ferrari, 1: Mercedes, 2: RedBull
+            var carSpawner; // Timer for the spawn of the opponent cars
+            var timer = 0; // Timer used in carSpawner
+            var passes = 0; // How many opponent cars the player has passed
+            var crash = false; // Indicates if the player has crashed
+            var crashType = 0; // 0: The car spins to the left, 1: The car spins to the right
+            var damagedTyreDirection = false; // The damaged tyre switches between two directions
+            
+            var textureLogoTeam; // Contains the texture that represent the logo of the team choosen
+            var lowResolution = false; // Indicates if the player has choosen a low resolution
+            var shadows = false; // Indicates if shadows are enabled
+            var fogEnabled = false; // Indicates if fog has been enabled
+            var source = 'models.json'; // Where to find the models
+            
+            // Sets up the basics of the scene. Auxiliary function of createMenu()
+            function setScene() {
+                scene = new THREE.Scene(); // We create the scene
+                scene.background = new THREE.Color(0xffffff); // The background is white
+            
+                camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000); // We create a perspective camera. (Parameters: fov, aspect ratio, near plane, far plane)
+                camera.position.set(-8,5,4); // We move the camera from the origin position
+                camera.up = new THREE.Vector3(0,1,0); // The orientation of the camera
+                camera.lookAt(new THREE.Vector3(0,0,0)); // We tell the camera to tell at the origin of the scene
+              
+                renderer = new THREE.WebGLRenderer({antialias: true}); // We create a WebGLRenderer with antialiasing enabled
+                setResolutionRenderer(); // We apply the resolution choosen to the renderer
+                renderer.shadowMap.enabled = true; // The renderer is able to render shadows
+                renderer.shadowMap.type = THREE.PCFSoftShadowMap; // Filters shadows through an algorithm that saves up some resources
+                document.body.appendChild(renderer.domElement); // We add the renderer (which is a canvas) to the body of the HTML file
+            
+                ambientLight = new THREE.AmbientLight(0xffffff, 1.0); // We create a white ambientLight that lights up the whole scene
+                scene.add(ambientLight);
+            
+                pointLight = new THREE.PointLight(0xffffff, 1.0); // We create a white pointLight
+                pointLight.position.set(9.0, 8.0, 0.0);
+                scene.add(pointLight);
+            
+                pointLight2 = new THREE.PointLight(0xffffff, 1.0); // We create a second white pointLight for presentation purposes
+                pointLight2.position.set(-2.0, 5.0, 4.0);
+                scene.add(pointLight2);
+                
+                window.addEventListener('resize', function(event) { // The browser window has changed size!
+                    setResolutionRenderer(); // We apply a new resolution to the renderer
+                    camera.aspect = window.innerWidth / window.innerHeight; // Scale the aspect ratio of the camera and update its projection matrix
+                    camera.updateProjectionMatrix(); } ); }
+            
+            // Loads the models in the .json file and add them to the scene. Auxiliary function of createMenu()
+            function modelsLoader() {
+                loader = new THREE.ObjectLoader(); // Loader we use the load the models
+                loader.load(source, 
+                        function (object) {
+                            objects = object; // The models can now be used outside the loader
+                            objects.traverse(function (child) { // We print on the console the names of the object's children
+                                console.log(child.name); } );
+                            loaded = true;
+                            tweakModels(); },
+                             
+                
+                        function (xhr) { // We print the current state of the loading process
+                            console.log((xhr.loaded / xhr.total * 100) + '% loaded'); },
+                
+                        function (error) { // We print this if an error has occurred during the loading
+                            console.log('An error happened'); } ); }
+            
+            // Alters some aspects of the models once they are loaded in. Auxiliary function of createMenu()
+            function tweakModels() {
+                models = objects.clone(true);
+                models.rotateY(-0.3); // We slightly rotate the models for better presentation when the game first loads
+                // Hide elements
+                models.getObjectByName("Torso Cockpit").visible = false; // We hide the children that must NOT show up in the menu
+                models.getObjectByName("Left Hand").visible = false;
+                models.getObjectByName("Right Hand").visible = false;
+                models.getObjectByName("Gameplay Road").visible = false;
+                models.getObjectByName("Damaged Front").visible = false;
+                models.getObjectByName("Front").visible = true;
+                    
+                // Create collisions box
+                collisionBoxPlayerVisible = new THREE.BoxHelper().setFromObject(models.getObjectByName("Front")); // We create an helperBox, which will help us visualize the collision box in the game itself for DEBUGGING purposes
+                collisionBoxPlayerVisible.scale.set(1.0, 0.8, 0.1); // We resize the boxHelper to better fit the front the car
+                collisionBoxPlayerVisible.updateMatrix(); // We update the matrix, so the changes take place
+                collisionBoxPlayerVisible.visible = false; // We hide the helperBox
+                models.getObjectByName("Front").add(collisionBoxPlayerVisible); // Add the helperBox to the scene
+                collisionBoxOpponentVisible = new THREE.BoxHelper().setFromObject(models.getObjectByName("Opponent Back")); // We now do the same for the opponent car's back
+                collisionBoxOpponentVisible.scale.set(0.7, 0.8, 0.2);
+                collisionBoxOpponentVisible.updateMatrix();
+                collisionBoxOpponentVisible.name = "Collision Box Visible"; // We add a name, so the box can be referenced later by the getObjectByName() function
+                collisionBoxOpponentVisible.visible = false;
+                models.getObjectByName("Opponent Back").add(collisionBoxOpponentVisible);
+                    
+                // Adjust materials
+                models.getObjectByName("Pit Road").material.roughness = 1.00;
+                models.getObjectByName("Gameplay Road").material.roughness = 1.00;
+                    
+                // Add textures and set right colors
+                var texturePirelli = new THREE.TextureLoader().load("textures/Pirelli.png"); // Texture for the upper part of the underpass
+                texturePirelli.wrapS = THREE.RepeatWrapping; // The texture repeats itself across the U,V coordinates
+                texturePirelli.wrapT = THREE.RepeatWrapping;
+                texturePirelli.anisotropy = renderer.capabilities.getMaxAnisotropy(); // This ensures a texture that is NOT blurry
+                texturePirelli.rotation = 1.57;
+                models.getObjectByName("Upper Underpass").material.map = texturePirelli; // We map the texture to the material
+                var textureTyres = new THREE.TextureLoader().load("textures/TyreNormal.jpg"); // Normal texture for the tyres
+                textureTyres.wrapS = THREE.RepeatWrapping;
+                textureTyres.wrapT = THREE.RepeatWrapping;
+                models.getObjectByName("Left Anterior Tyre").material.normalMap = textureTyres;
+                models.getObjectByName("Right Anterior Tyre").material.normalMap = textureTyres;
+                models.getObjectByName("Left Posterior Tyre").material.normalMap = textureTyres;
+                models.getObjectByName("Right Posterior Tyre").material.normalMap = textureTyres;
+                var textureMetal = new THREE.TextureLoader().load("textures/MetalNormal.jpg"); // Normal texture for the body of the car
+                textureMetal.wrapS = THREE.RepeatWrapping;
+                textureMetal.wrapT = THREE.RepeatWrapping;
+                models.getObjectByName("Front").material.normalMap = textureMetal;
+                models.getObjectByName("Front").material.normalScale = new THREE.Vector2(0.1, 0.1);
+                setTeamColors(); // We apply the right colors and logo texture to the car
+                    
+                // Create texture for the screen on the wheel
+                wheelScreenText();
+                    
+                scene.add(models); // We add the models to the scene
+                if (shadows == true) { // We enable shadows if the option is selected
+                        setShadows(); } }
+            
+            // Creates the menu screens. Auxiliary function of createMenu()
+            function createMenuText() {
+                title = document.createElement('div'); // We create the title logo of the game
+                title.id = "title"; // How the logo should be rendered is detailed in the style.css file
+                title.innerHTML = "Formula Driver"; // The text inside the div
+                document.body.appendChild(title); // We add the div to the body of the HTML file
+                
+                playButton = document.createElement('button'); // Creates the Play button inside the title element
+                playButton.id = "Play";
+                playButton.innerHTML = "PLAY";
+                playButton.style.background = "yellow"; // The button is yellow as well
+                title.appendChild(playButton);
+                
+                optionsButton = document.createElement('button'); // Creates the Options button inside the title element
+                optionsButton.id = "Options";
+                optionsButton.innerHTML = "OPTIONS";
+                optionsButton.style.background = "yellow";
+                title.appendChild(optionsButton);
 
-    // Avg line parameters
-    var barsClicked = []; // List of bars clicked in the total points chart
-    var nBarsClicked = 0;
-    var cumulativePoints = 0;
-    
-    // DNF parameters
-    var maxValueDNF = 0; // The max value of the x scale for the DNF chart
-    
-    // DEBUG
-    var showTitleImage = 1;
-    var animationsSpeed = 1; // 1: No animations, 1000: default
-    
-    // Draws the title screen above the charts
-    function drawTitle() {
-        // Creates the wrapper div that contains the div 'title'
-        aboveWrapper = document.createElement('div');
-        aboveWrapper.id = "abovewrapper";
-        aboveWrapper.onmouseover = function() {
-            writeOnAbout(0);
-        }
-        document.body.appendChild(aboveWrapper);
-        
-        // Creates the div 'title' which contains text, selections and buttons
-        var title = document.createElement('div');
-        title.id = "title";
-        if (showTitleImage) {
-            var image = document.createElement("img");
-            image.setAttribute("src", "Logo3B.png");
-            image.setAttribute("height", "76px");
-            image.setAttribute("width", "445px");
-            title.appendChild(image);
-        }
-        else {
-            title.innerHTML = "<h2>Formula 1 Driver Analyser</h2>";
-        }
-        aboveWrapper.appendChild(title);   
-        
-        // Creates the div 'menu' which allows the user to select a driver
-        var menu = document.createElement('div');
-        menu.id = "menu";
-        aboveWrapper.appendChild(menu);
-        
-        // Initializes an empty svg for the time slider
-        var svgDriversTimeSliderDiv = document.createElement('div');
-        svgDriversTimeSliderDiv.id = "driverstimeslider";
-        menu.appendChild(svgDriversTimeSliderDiv);
-        driversTimeSliderSvg = d3.select('#driverstimeslider')
-            .append('svg')
-                .attr("width", 422)
-                .attr("height", 40)
-                //.style("background-color", "red")
-            .append("g")
-                .attr("transform", "translate(" + 10 + "," + 6 + ")")
-                .attr("class", "driverstimeslider");
-        
-        // Creates a selection for the drivers with a default option, and adds it to 'title'
-        menu.innerHTML += "Please select a driver: ";
-        var selectDriver = document.createElement('select');
-        selectDriver.id = "select-driver";
-        selectDriver.style.width = "150px";
-        var defaultDriverOption = document.createElement('option');
-        defaultDriverOption.value = 0;
-        defaultDriverOption.innerHTML = "- DRIVER -";
-        selectDriver.appendChild(defaultDriverOption);
-        menu.appendChild(selectDriver);
-        menu.innerHTML += " ";
-        
-        // Creates the search button, makes it disabled and adds it to 'title'
-        var searchButton = document.createElement('button');
-        searchButton.id = "search";
-        searchButton.innerHTML = "Search data!";
-        searchButton.disabled = true;
-        menu.appendChild(searchButton);
-        
-        // Creates the about section and adds a short description of the project
-        var about = document.createElement('div');
-        about.id = "about";
-        aboveWrapper.appendChild(about);
-        writeOnAbout(0);
-        
-        loadData();
-    }
-    
-    // Loads the data from the csv file
-    function loadData() {
-        d3.queue()
-            .defer(d3.csv, "results.csv")
-            .defer(d3.csv, "qualifying.csv")
-            .defer(d3.csv, "driverStandings.csv")
-            .await(function(error, data, data2, data3) {
-                // Prints the error in case something goes wrong
-                if (error) {
-                    console.log(error);
-                }
-                // Everything goes ok!
-                else {
-                    data.forEach(function(d) { // Cycles through the data
-                        d.surname = d.surname.replace(/[\s.']/g, '_'); // Removes eventual spaces in the surnames
-                        d.name = d.name.replace(/[\s.']/g, '_'); // Removes eventual spaces in the names
-                        d.constructor = d.constructor.replace(/[\s.']/g, '_');
-                        var driver = d.surname + "_" + d.name;
-                        if (d.year >= 1994 && d.year <= 2020 && !drivers.includes(driver)) {
-                            drivers.push(driver);
-                            allDrivers.push(driver);
-                        }
-                    });
+                aboutButton = document.createElement('button'); // Creates the About button inside the title element
+                aboutButton.id = "About";
+                aboutButton.innerHTML = "!";
+                aboutButton.style.background = "yellow";
+                title.appendChild(aboutButton);
+                
+                easyButton = document.createElement('button'); // We create all the buttons inside the Options screen
+                easyButton.id = "Easy";
+                easyButton.innerHTML = "EASY";
+                if (choosenDifficulty == 0.5) { // We disable buttons if their options have already been choosen
+                    easyButton.disabled = true; }
+                normalButton = document.createElement('button');
+                normalButton.id = "Normal";
+                normalButton.innerHTML = "NORMAL";
+                if (choosenDifficulty == 1.0) {
+                    normalButton.disabled = true; }
+                hardButton = document.createElement('button');
+                hardButton.id = "Hard";
+                hardButton.innerHTML = "HARD";
+                if (choosenDifficulty == 1.5) {
+                    hardButton.disabled = true; }
+                
+                resolutionLowButton = document.createElement('button');
+                resolutionLowButton.id = "Low";
+                resolutionLowButton.innerHTML = "LOW";
+                if (lowResolution == true) {
+                    resolutionLowButton.disabled = true; }
+                resolutionNativeButton = document.createElement('button');
+                resolutionNativeButton.id = "Native";
+                resolutionNativeButton.innerHTML = "NATIVE";
+                if (lowResolution == false) {
+                    resolutionNativeButton.disabled = true; }
+                
+                shadowsOffButton = document.createElement('button');
+                shadowsOffButton.id = "shadowsOff";
+                shadowsOffButton.innerHTML = "OFF";
+                if (shadows == false) {
+                    shadowsOffButton.disabled = true; }
+                shadowsOnButton = document.createElement('button');
+                shadowsOnButton.id = "shadowsOn";
+                shadowsOnButton.innerHTML = "ON";
+                if (shadows == true) {
+                    shadowsOnButton.disabled = true; }
                     
-                    data2.forEach(function(d) { // Cycles through the qualifying data
-                        d.surname = d.surname.replace(/[\s.']/g, '_'); // Removes eventual spaces in the surnames
-                        d.name = d.name.replace(/[\s.']/g, '_'); // Removes eventual spaces in the names
-                        d.constructor = d.constructor.replace(/[\s.']/g, '_');
-                    });
-                    
-                    data3.forEach(function(d) { 
-                        d.surname = d.surname.replace(/[\s.']/g, '_'); 
-                        d.name = d.name.replace(/[\s.']/g, '_'); 
-                    });
-                    
-                    // Sort all drivers in alphabetical order
-                    drivers.sort(function(a, b) {
-                        a = a.toUpperCase();
-                        b = b.toUpperCase();
-                        if (a < b) { 
-                            return -1; 
-                        }
-                        if (a > b) { 
-                            return 1; 
-                        }
-                        return 0;
-                    });
-                    
-                    extractDriverAchievements(drivers, data, data2, data3); // Extracts the most important achievements from all drivers
-                    executePCA();             
-                    addDriversToTitle(); // Adds the events to the user's selections in the title now that the data is loaded
-                    enableInputsToTitle(data, data2);
-                }
-            });
-    }
-    
-    // Extract the most important achievements from all drivers
-    function extractDriverAchievements(drivers, data, data2, data3) {
-        for (i = 0; i < drivers.length; i++) {
-            var driver = drivers[i];
-            var championships = 0;
-            var years = []; // Years where the championship was won
-            var points = 0;
-            var wins = 0;
-            var podiums = 0;
-            var poles = 0;
-            var starts = 0;
-            var finishes = 0;
+                fogOffButton = document.createElement('button');
+                fogOffButton.id = "fogOff";
+                fogOffButton.innerHTML = "OFF";
+                if (fogEnabled == false) {
+                    fogOffButton.disabled = true; }
+                fogOnButton = document.createElement('button');
+                fogOnButton.id = "fogOn";
+                fogOnButton.innerHTML = "ON";
+                if (fogEnabled == true) {
+                    fogOnButton.disabled = true; }
+                 
+                ferrariButton = document.createElement('button');
+                ferrariButton.id = "Ferrari";
+                ferrariButton.innerHTML = "FERRARI";
+                if (team == 0) {
+                    ferrariButton.disabled = true; }
+                mercedesButton = document.createElement('button');
+                mercedesButton.id = "Mercedes";
+                mercedesButton.innerHTML = "MERCEDES";
+                if (team == 1) {
+                    mercedesButton.disabled = true; }
+                redbullButton = document.createElement('button');
+                redbullButton.id = "Redbull";
+                redbullButton.innerHTML = "REDBULL";
+                if (team == 2) {
+                    redbullButton.disabled = true; }
+                
+                options = document.createElement('div'); // Creates a div where all the options are displayed
+                options.id = "description";
+                options.style.textAlign = "center";
+                options.innerHTML = "Difficulty: <br>";
+                options.appendChild(easyButton); 
+                options.appendChild(normalButton);
+                options.appendChild(hardButton);
+                options.innerHTML += "<br>(Difficulty affects initial speed of the car)";
+                options.innerHTML += "<br><br>Resolution: <br>";
+                options.appendChild(resolutionLowButton);
+                options.appendChild(resolutionNativeButton);
+                options.innerHTML += "<br>(If the game runs poorly, choose 'LOW')";
+                options.innerHTML += "<br><br>Shadows: <br>";
+                options.appendChild(shadowsOffButton);
+                options.appendChild(shadowsOnButton);
+                options.innerHTML += "<br>('ON' option may impact performance)";
+                options.innerHTML += "<br><br>Fog: <br>";
+                options.appendChild(fogOffButton);
+                options.appendChild(fogOnButton);
+                options.innerHTML += "<br>('ON' option may impact performance)";
+                options.innerHTML += "<br><br>Team: <br>";
+                options.appendChild(ferrariButton);
+                options.appendChild(mercedesButton);
+                options.appendChild(redbullButton);
+                options.innerHTML += "<br>(Team selection is purely cosmetic)<br><br>";
+                document.body.appendChild(options);
+                options.style.visibility = "hidden";
+                
+                optionsExitButton = document.createElement('button'); // Button that lets you close the Options screen
+                optionsExitButton.id = "optionsExit";
+                optionsExitButton.innerHTML = "CLOSE";
+                options.appendChild(optionsExitButton);
+                
+                about = document.createElement('div'); // Creates a div where the synopsis and controlls are displayed
+                about.id = "description";
+                var synopsis = document.createElement('div');
+                synopsis.innerHTML = "PREMISE";
+                synopsis.style.textAlign = "center";
+                about.appendChild(synopsis);
+                about.innerHTML += "It was supposed to be an easy weekend, but after an unfortunate qualifying session, you had to start the race at the last place.<br>";
+                about.innerHTML += "Not all hope is lost however!<br>";
+                about.innerHTML += "Your car is still the fastest of the grid and the layout of the track, an unnatural long straight, gives you ample possibilities to pass your rivals... who happen to be in thousands!<br>";
+                about.innerHTML += "To help you, your engineers have installed a device that increases your speed after every 50 passes: just be careful!<br>";
+                about.innerHTML += "See you on the track, driver!<br><br>";
+                var controls = document.createElement('div');
+                controls.innerHTML = "CONTROLS";
+                controls.style.textAlign = "center";
+                about.appendChild(controls);
+                about.innerHTML += "- 'a': Move your car to the left.<br>";
+                about.innerHTML += "- 'd': Move your car to the right.<br>";
+                about.innerHTML += "- 'v': Switch between the two camera views.<br>";
+                about.innerHTML += "- 'p': Pause or resume the game.<br><br>";
+                document.body.appendChild(about);
+                about.style.visibility = "hidden";
+                
+                aboutExitButton = document.createElement('button'); // Button that lets you close the About screen
+                aboutExitButton.id = "aboutExit";
+                aboutExitButton.innerHTML = "CLOSE";
+                var center = document.createElement('div'); // Divider needed to center the button
+                center.style.textAlign = "center";
+                about.appendChild(center);
+                center.appendChild(aboutExitButton); }
             
-            data.forEach(function(d) {
-                if (driver == d.surname + "_" + d.name) {
-                    starts += 1;
-                    points += parseInt(d.points);
-                    if (d.position >= 1 && d.position <= 3) {
-                        podiums += 1;
-                        if (d.position == 1) {
-                            wins += 1;
-                        }
-                    }
-                    if (d.status == "Finished" || d.status.substring(0, 1) == "+") {
-                        finishes += 1;
-                    }
-                }
-            });
+            // Assign the events to each button in the menu. Auxiliary function of createMenu()
+            function assignButtons() {
+                // Open Options scren
+                optionsButton.onclick = function() {
+                    this.disabled = true;
+                    aboutButton.disabled = false;
+                    options.style.visibility = "visible";
+                    about.style.visibility = "hidden"; }
+                
+                // Option events: difficulty
+                document.getElementById("Easy").onclick = function() { // For some reason easyButton.onclick doesn't work: the same for the following buttons
+                    this.disabled = true;
+                    document.getElementById("Normal").disabled = false;
+                    document.getElementById("Hard").disabled = false;
+                    choosenDifficulty = 0.5; }
+                    
+                document.getElementById("Normal").onclick = function() {
+                    this.disabled = true;
+                    document.getElementById("Easy").disabled = false;
+                    document.getElementById("Hard").disabled = false;
+                    choosenDifficulty = 1.0; }
+                    
+                document.getElementById("Hard").onclick = function() {
+                    this.disabled = true;
+                    document.getElementById("Easy").disabled = false;
+                    document.getElementById("Normal").disabled = false;
+                    choosenDifficulty = 1.5; }
+                 
+                // Option events: resolution
+                document.getElementById("Low").onclick = function() {
+                    this.disabled = true;
+                    document.getElementById("Native").disabled = false; 
+                    lowResolution = true;
+                    setResolutionRenderer(); }
+                
+                document.getElementById("Native").onclick = function() {
+                    this.disabled = true;
+                    document.getElementById("Low").disabled = false;
+                    lowResolution = false;
+                    setResolutionRenderer(); }
+                
+                // Option events: shadows
+                document.getElementById("shadowsOff").onclick = function() {
+                    this.disabled = true;
+                    document.getElementById("shadowsOn").disabled = false;
+                    shadows = false;
+                    setShadows(); }
+                    
+                document.getElementById("shadowsOn").onclick = function() {
+                    this.disabled = true;
+                    document.getElementById("shadowsOff").disabled = false; 
+                    shadows = true;
+                    setShadows(); }
+                    
+                // Option events: fog
+                document.getElementById("fogOff").onclick = function() {
+                    this.disabled = true;
+                    document.getElementById("fogOn").disabled = false;
+                    fogEnabled = false; }
+                    
+                document.getElementById("fogOn").onclick = function() {
+                    this.disabled = true;
+                    document.getElementById("fogOff").disabled = false; 
+                    fogEnabled = true; }
+                
+                // Option events: teams
+                document.getElementById("Ferrari").onclick = function() {
+                    this.disabled = true;
+                    document.getElementById("Mercedes").disabled = false;
+                    document.getElementById("Redbull").disabled = false;
+                    team = 0;
+                    setTeamColors(); }
+                    
+                document.getElementById("Mercedes").onclick = function() {
+                    this.disabled = true;
+                    document.getElementById("Ferrari").disabled = false;
+                    document.getElementById("Redbull").disabled = false;
+                    team = 1;
+                    setTeamColors(); }
+                
+                document.getElementById("Redbull").onclick = function() {
+                    this.disabled = true;
+                    document.getElementById("Ferrari").disabled = false;
+                    document.getElementById("Mercedes").disabled = false; 
+                    team = 2;
+                    setTeamColors(); }
+                 
+                // Closes Option screen
+                optionsExitButton.onclick = function() {
+                    optionsButton.disabled = false;
+                    options.style.visibility = "hidden"; }
+                
+                // Open the About screen
+                aboutButton.onclick = function() { 
+                    this.disabled = true;
+                    optionsButton.disabled = false;
+                    about.style.visibility = "visible";
+                    options.style.visibility = "hidden"; }
+                
+                // Closes the About screen
+                aboutExitButton.onclick = function() {
+                    aboutButton.disabled = false;
+                    about.style.visibility = "hidden"; }
+                
+                // Begings the game
+                playButton.onclick = function() {
+                    createGameplay(); }; }
+                    
+            // Creates the menu of the game. Auxiliary function of init()
+            function createMenu() {
+                document.title = "Formula Driver - Menu"; 
+                setScene();
+                if (loaded == false) { // Loads the models and then tweak them (tweakModels() is contained inside modelsLoader())
+                    modelsLoader(); } 
+                else { // Just tweaks the models since they are already loaded in
+                    tweakModels(); }
+                createMenuText();
+                assignButtons(); }
+             
+            // Animates the menu. Auxiliary function of init()
+            function animateMenu() {
+                scene.rotateY(0.002); // The entire scene rotate slowly on the Y axis
+                menuAnimation = requestAnimationFrame(animateMenu); // The canvas is updated at each frame
+                renderer.render(scene, camera); } // We use the renderer to render the scene and the camera
             
-            data2.forEach(function(d) {
-                if (driver == d.surname + "_" + d.name && d.position == 1) {
-                    poles += 1;
-                }
-            });
+            // Spawn a new opponent car at the end of the road. Auxiliary function of createGameplay() and animateGameplayRoad()
+            function spawnNewCar() {
+                if (pause == false) { // We update the timer if the game has not been paused
+                    timer = timer+1;
+                    if (timer >= 30*(2-difficulty)) { // The max value for the timer depends on the actual difficulty level
+                        timer = 0; // Wer reset the timer. Time to spawn a new car!
+                        var min = -0.385; // Left side of the road
+                        var max = 0.385; // Right side of the road
+                        var positionY = (Math.random() * (max - min) + min).toFixed(3); // Chooses a value between min and max
+                        var car = new THREE.Group(); // Creates a new opponent car
+                        car = models.getObjectByName("Opponent Body").clone(true);
+                        models.getObjectByName("Gameplay Road").add(car); // Add the car to the road in the random coordinates obtained
+                        car.position.set(-spawnPoint, positionY, car.position.z);
+                        var color = Math.floor(Math.random() * 5); // Chooses a random color for the opponent car
+                        var material = new THREE.MeshStandardMaterial(); // Create a new material where we apply the color
+                        if (color == 0) { // Yellow
+                            material.color = new THREE.Color(0xffff00); }
+                        else if (color == 1) { // Light Blue
+                            material.color = new THREE.Color(0x0000ff); }
+                        else if (color == 2) { // Purple
+                            material.color = new THREE.Color(0x800080); }
+                        else if (color == 3) { // Orange
+                            material.color = new THREE.Color(0xff8000); }
+                        else if (color == 4) { // Green
+                            material.color = new THREE.Color(0x008000); }
+                        car.material = material; // Apply the material to the car
+                        car.getObjectByName("Opponent Back").material = material; 
+                        car.getObjectByName("Opponent Front").material = material;
+                        car.getObjectByName("Opponent Right Side").material = material;
+                        car.getObjectByName("Opponent Left Side").material = material; } }
+                if (crash == false) { // No new cars are spawned if there's a crash
+                    requestAnimationFrame(spawnNewCar); } }
             
-            var last_championship_position = 0;
-            var last_year = 0;
-            data3.forEach(function(d) { 
-                if (d.year != last_year && last_championship_position == 1) {
-                        championships += 1;
-                        years.push(last_year);
-                        last_year = 0;
-                        last_championship_position = 0;
-                }
-                if (driver == d.surname + "_" + d.name) {
-                    last_year = d.year;
-                    last_championship_position = d.position;
-                }
-            });
-            
-            if (driver == "Hamilton_Lewis") {
-                championships += 1;
-                years.push("2020");
-            }
-       
-            var newTuple = {
-                driver: driver,
-                championships: championships,
-                years: years,
-                points: points,
-                wins: wins,
-                podiums: podiums,
-                poles: poles,
-                starts: starts,
-                finishes: finishes
-            }
-            achievements.push(newTuple);
-        }     
-    }
-    
-    // Communicates with a Python script that executes a PCA on the achievements of the drivers
-    function executePCA() {
-        $.ajax({
-            /*headers: {
-                'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin':'*'
-            }, */
-            type: 'POST',
-            url: "https://formula-1-driver-analyser-pca.herokuapp.com/pca",
-            data: JSON.stringify({value: achievements}),
-            crossDomain: true,
-            success: function (response) {
-                for (i = 0; i < response.length; i++) {
-                    var tuple = {
-                        driver: achievements[i].driver,
-                        pca1: response[i][0],
-                        pca2: response[i][1]
-                    }
-                    PCAdata.push(tuple);
-                }
-            },
-            error: function (xhr, status) {
-                console.log("Couldn't contact the python script!");
-            },         
-        });
-        
-        /*DEBUG
-        console.log(PCAdata); */
-    }
- 
-    // Adds the correct list of drivers to the selection
-    function addDriversToTitle() {
-        for (i = 0; i < drivers.length; i++) {
-            var newDriverOption = document.createElement('option'); // Makes the new season a selectable option 
-            newDriverOption.value = i+1;
-            newDriverOption.innerHTML = drivers[i].replace(/_/g, ' ');
-            document.getElementById("select-driver").appendChild(newDriverOption);
-        }   
-    }
-    
-    // Adds events to the interactions of the user with the title screen
-    function enableInputsToTitle(data, data2) {
-        // Creates and adds the time slider
-        var sliderDrivers = d3.sliderBottom()
-            .min(1994)
-            .max(2020)
-            .width(400)
-            .tickFormat(d3.format('d'))
-            .ticks(5)
-            .default([1994, 2020])
-            .step(1)
-            .fill('#2196f3')
-            .on('onchange', val => {
-                if (val[0] > val[1]) {
-                    var swap = val[1];
-                    val[1] = val[0];
-                    val[0] = swap;
-                }
-                
-                // Disables search button, restores default option and deletes all the other options
-                document.getElementById("search").disabled = true;
-                document.getElementById("select-driver").value = 0;
-                var options = document.getElementById("select-driver").options.length;
-                for (i = options-1; i > 0; i--) {
-                    document.getElementById("select-driver").options[i] = null;
-                }
-                
-                // Gets the new list of drivers
-                drivers = [];
-                data.forEach(function(d) { // Cycles through the data
-                    var driver = d.surname + "_" + d.name;
-                    if (d.year >= val[0] && d.year <= val[1] && !drivers.includes(driver)) {
-                        drivers.push(driver);
-                    }
-                });
-                
-                // Sort all drivers in alphabetical order
-                drivers.sort(function(a, b) {
-                    a = a.toUpperCase();
-                    b = b.toUpperCase();
-                    if (a < b) { 
-                        return -1; 
-                    }
-                    if (a > b) { 
-                        return 1; 
-                    }
-                    return 0;
-                });
-                
-                addDriversToTitle();
-            });
-        d3.select(".driverstimeslider").call(sliderDrivers); 
-    
-        document.getElementById("select-driver").onchange = function() { 
-            if (document.getElementById("select-driver").value > 0) {  // A valid driver is selected: enables search button
-                document.getElementById("search").disabled = false;
-            }
-            else { // Default option selected: disables search button
-                document.getElementById("search").disabled = true;
-            }
-        }
-        search.onclick = function() { // Checks if the user clicks the search button
-            var value = document.getElementById("select-driver").value;
-            selectedDriver = drivers[value-1];
-            initializeChartsLayout(data, data2);
-        }    
-    }
-    
-    // Prepares the layouts of the charts before plotting data on them
-    function initializeChartsLayout(data, data2) {
-        // Removes the previous layout
-        if (document.body.contains(wrapper)) {
-            wrapper.remove();
-            bottomWrapper.remove();
-            document.getElementById("selecteddriver").remove();
-            document.getElementById("endingdiv").remove();
-        }
-        
-        // Restores global variables
-        showTotalPoints = true;
-        showWinsInRaces = true;
-        PCAmode = 0;
-        circuits = [];
-        flagAddCircuits = 0;
-        constructors = [];
-        constructorsDisabled = []; 
-        lastConstructorEnabled = "";
-        teammates = [];
-        teammatesDisabled = []; 
-        teammatesShowing = []; 
-        lastTeammateEnabled = "";
-        driversDisabled = [];
-        
-        driversHovered = [];
-        
-        selectedTrackDNF = 0;
-        minYearSelectedDNF = 0;
-        maxYearSelectedDNF = 0;
-        
-        selectedTrackCons = 0;
-        minYearSelectedCons = 0;
-        maxYearSelectedCons = 0;
-        
-        maxValueDNF = 0;
-        
-        colors = d3.scaleOrdinal(d3.schemeCategory20);
-        colorsTeammates = d3.scaleOrdinal(d3.schemeCategory20);
-        
-        // Appends the div with the name and stats of the driver selected
-        var points;
-        var wins;
-        var poles;
-        var championships;
-        var years;
-        for (i = 0; i < achievements.length; i++) {
-            if (achievements[i].driver == selectedDriver) {
-                points = achievements[i].points;
-                starts = achievements[i].starts;
-                finishes = achievements[i].finishes;
-                wins = achievements[i].wins;
-                podiums = achievements[i].podiums;
-                poles = achievements[i].poles;
-                championships = achievements[i].championships;
-                years = achievements[i].years;
-            }
-        }       
-        var driverSelectedDiv = document.createElement('div');
-        driverSelectedDiv.id = "selecteddriver";
-        driverSelectedDiv.innerHTML = "<b>- " + selectedDriver.replace(/_/g, ' ') + " -</b><br>";
-        driverSelectedDiv.innerHTML += "<b><i>Points: </i></b>" + points + " --- <b><i>Starts: </i></b>" + starts + " --- <b><i>Finishes: </i></b>" + finishes + " --- <b><i>Podiums: </i></b>" + podiums + " --- <b><i>Wins: </i></b>" + wins + " --- <b><i>Poles: </i></b>" + poles + " --- <b><i>Championships: </i></b>" + championships;
-        if (years.length > 0) {
-            driverSelectedDiv.innerHTML += " [";
-            for (i = 0; i < years.length-1; i++) {
-                driverSelectedDiv.innerHTML += years[i] + ", ";
-            }
-            driverSelectedDiv.innerHTML += years[years.length-1] + "]";
-        }
-        driverSelectedDiv.onmouseover = function() {
-            writeOnAbout(0);
-        }
-        document.body.appendChild(driverSelectedDiv);
-        
-        // Initializes the middle wrapper
-        wrapper = document.createElement('div');
-        wrapper.id = "middlewrapper";
-        wrapper.innerHTML += "<br>";
-        document.body.append(wrapper);
-        
-        // Prepares all the layouts in the middle wrapper
-        preparePointsAchieved(data, data2);    
-        prepareComparisons(data, data2);
-        
-        // Initializes the bottom wrapper
-        bottomWrapper = document.createElement('div');
-        bottomWrapper.id = "bottomwrapper";
-        bottomWrapper.innerHTML += "<br>";
-        document.body.append(bottomWrapper);
-        
-        // Prepares all the layouts in the bottom wrapper
-        prepareDNF(data);
-        prepareConsistency(data);
-        preparePCA(data, data2);
-        
-        // Appends the yellow ending div
-        var endingDiv = document.createElement('div');
-        endingDiv.id = "endingdiv";
-        endingDiv.innerHTML = "- All data taken from ";
-        var link = document.createElement('a');
-        link.innerHTML = "Kaggle";
-        link.setAttribute('href', "https://www.kaggle.com/rohanrao/formula-1-world-championship-1950-2020");
-        endingDiv.appendChild(link);
-        endingDiv.innerHTML += " and integrated using ";
-        link = document.createElement('a');
-        link.innerHTML = "Talend";
-        link.setAttribute('href', "https://www.Talend.com");
-        endingDiv.appendChild(link);
-        endingDiv.innerHTML += " -";
-        document.body.appendChild(endingDiv);
-    }
-    
-    // Prepares the layout for the points achieved chart
-    function preparePointsAchieved(data, data2) { 
-        // Initializes the div that contains the svg area for the points bars    
-        var svgDiv = document.createElement('div');
-        svgDiv.id = "bargraph";
-        svgDiv.innerHTML = "<b>Points Per Season</b><br>";
-        svgDiv.onmouseover = function() {
-            writeOnAbout(1);
-        }
-        wrapper.append(svgDiv); 
-        
-        // Initalizes an empty svg for the points bars
-        barSvg = d3.select('#bargraph')
-            .append('svg')
-                .attr("width", container_dimensions.width)
-                .attr("height", container_dimensions.height)
-                //.style("background-color", "red")
-            .append("g")
-                .attr("transform", "translate(" + margins.left + "," + margins.top + ")")
-                .attr("id", "bargraph");
-        
-        // Adds radios button in order to switch between total points and average points per race
-        var optionsDiv = document.createElement('div');
-        svgDiv.appendChild(optionsDiv);
-        optionsDiv.style.fontSize = "14px";
-        optionsDiv.innerHTML = "Show: ";
-        var totalButton = document.createElement('input');
-        totalButton.type = 'radio';
-        totalButton.name = 'points';
-        totalButton.id = 'total-points';
-        totalButton.value = "total";
-        var label = document.createElement('label');
-        label.innerHTML = "Total Points";
-        optionsDiv.appendChild(totalButton);
-        optionsDiv.appendChild(label);
-        optionsDiv.innerHTML += "   ";
-
-        var averageButton = document.createElement('input');
-        averageButton.type = 'radio';
-        averageButton.name = 'points';
-        averageButton.id = 'average-points';
-        averageButton.value = "average";
-        label = document.createElement('label');
-        label.innerHTML = "Average Points Per Race";
-        optionsDiv.appendChild(averageButton);
-        optionsDiv.appendChild(label);
-        document.getElementById("total-points").checked = true;
-        
-        document.getElementById('total-points').onclick = function() {
-            showTotalPoints = true;
-            plotPointsAchieved(data);
-        }
-        document.getElementById('average-points').onclick = function() {
-            showTotalPoints = false;
-            plotPointsAchieved(data);
-        }
-      
-        // Initializes the div for the points bar graph legend
-        svgLegendDiv = document.createElement('div');
-        svgLegendDiv.innerHTML = "Constructors<br>";
-        svgLegendDiv.id = "legendtable";
-        svgLegendDiv.onmouseover = function() {
-            writeOnAbout(1);
-        }
-        wrapper.append(svgLegendDiv);
-        
-        // Initializes the empty svg for the bar graph legend
-        svgLegend = d3.select('#legendtable')
-            .append('svg')
-                .attr("width", legend_width)
-                .attr("height", container_dimensions.height)
-                // .style("background-color", "red")
-                .append("g")
-                    .attr("transform", "translate(" + 0 + "," + margins.top/4 + ")")
-                    .attr("id","legendtable");
-        
-        // Plots the bar graph that shows the points achieved by the driver season by season
-        plotPointsAchieved(data, data2);
-    }
-          
-    // Plot a bar graph that shows the points achieved by the driver season by season
-    function plotPointsAchieved(data, data2) {
-        // Erase previous data
-        barSvg.selectAll('*').remove();
-        barsClicked = []; 
-        nBarsClicked = 0;
-        cumulativePoints = 0
-    
-        // Finds the relevant data to plot
-        relevantData = findPointsAchieved(data);
-  
-        // Initializes the x scale
-        minYear = relevantData[0].key;
-        maxYear = relevantData[relevantData.length-1].key;
-        x = d3.scaleBand()
-            .domain(relevantData.map(function(d) {
-                return d.key;
-            }))
-            .range([0, chart_dimensions.width])
-            .padding(.5);
-        
-        // Initializes the y scale
-        maxPoints = 0;
-        for (i = 0; i < relevantData.length; i++) {
-            var points = 0;
-            for (j = 0; j < relevantData[i].values.length; j++) {
-                points += relevantData[i].values[j].value.totalPoints;
-            }
-            if (points > maxPoints) {
-                maxPoints = points;
-            }
-        }
-        if (maxPoints == 0) {
-            maxPoints = 1;
-        }
-        y = d3.scaleLinear()
-            .domain([maxPoints, 0])
-            .range([0, chart_dimensions.height]);
-        
-        // Initializes the axis
-        xAxis = d3.axisBottom(x).ticks().tickFormat(d3.format("d"));
-        yAxis = d3.axisLeft(y).ticks().tickFormat(d3.format("d"));
-        
-        // Appends the x axis
-        barSvg.append("g")
-            .attr("class","x_axis")
-            .attr("transform", "translate(0,"+(chart_dimensions.height)+")")
-            .call(xAxis);
-        barSvg.append("text")
-            .attr("class","label")
-            .attr("x", chart_dimensions.width)
-            .attr("y", chart_dimensions.height+(margins.bottom-10))
-            .style("text-anchor","end")
-            .text("Seasons");
-        
-        // Appends the y axis
-        barSvg.append("g")
-            .attr("class","y_axis")
-            .call(yAxis)
-        barSvg.append("text")
-            .attr("class","label")
-            .attr("transform","rotate(-90)")
-            .attr("y", 6)
-            .attr("dy","-2.2em")
-            .style("text-anchor","end")
-            .text(function() {
-                if (showTotalPoints) {
-                    return "Total Points";
-                }
-                else {
-                    return "Avg. Points Per Race";
-                }
-            });
-       
-        // Draws the bars
-        for (i = 0; i < relevantData.length; i++) { // Cycles through the years
-            year = relevantData[i].key;
-            for (j = 0; j < relevantData[i].values.length; j++) { // Cycles through the constructors per year
-                constructor = relevantData[i].values[j].key;
-                
-                // Adds constructor to the the list
-                if (!constructors.includes(constructor)) { 
-                    constructors.push(constructor);
-                } 
-                // Check if there's a bar below (aka a constructor change in the season) and if so, it takes its measures
-                if (j > 0) { 
-                    barBelowY = relevantData[i].values[j-1].value.totalPoints;
-                }
-                
-                // Draws the bar
-                bar = barSvg.selectAll("bar")
-                    .data([relevantData[i].values[j].value]) // The [ ] parenthesis turn the object in an array
-                    .enter()
-                    .append("rect")
-                        .attr("class", constructor + year)
-                        .attr("id", function(d) {
-                            return d.totalPoints;
-                        })
-                        .style("fill", function(d) {
-                            return colors(constructor);
-                        })
-                        .style("opacity", function(d) {
-                            if (d.totalPoints == 0) {
-                                return 0; }
-                            else {
-                                return 1;
-                            }
-                        })
-                        .attr("stroke-width", 1)
-                        .attr("x", x(year)) 
-                        .attr("width", x.bandwidth)
-                        .attr("y", y(0))
-                        .attr("height", 0);
-                        
-                // Handles the animations
-                drawInvisibleBar = true; // Flag that indicates to draw an invisible bar in case there are no points (so that labels can still appear)
-                bar.transition()
-                    .duration(animationsSpeed)
-                    .attr("y", function(d) { 
-                        if (j > 0) { // If there's a bar below, stack the new bar above it
-                            return y(d.totalPoints + barBelowY);
-                        }
-                        if (d.totalPoints == 0) { // Check if to draw an invisible bar
-                            for (z = j; z < relevantData[i].values.length; z++) { // Checks if the driver got points with other constructors in that year
-                                if (relevantData[i].values[z].value.totalPoints > 0) {
-                                    drawInvisibleBar = false; // Can't draw a bar since there's will be a visible bar later for this year
-                                }
-                            }
-                            if (drawInvisibleBar) {
-                                return y(maxPoints);
-                            }
-                        }
-                        return y(d.totalPoints); 
-                    })
-                    .attr("height", function(d) { 
-                        if (j > 0) {
-                            return y(barBelowY) - y(d.totalPoints+barBelowY);
-                        }
-                        if (d.totalPoints == 0 && drawInvisibleBar) { // Invisible bar
-                            return chart_dimensions.height - y(maxPoints);
-                        }
-                        return chart_dimensions.height - y(d.totalPoints); 
-                    });
-                
-                // Handles inputs                 
-                bar.on("mouseover", function(d) {  
-                    document.body.style.cursor = "pointer";
-                    if (nBarsClicked == 0) {
-                        d3.select(this)
-                            .style("stroke", "black");
-                    }
-                    // Draws a label with information about the bar
-                    coords = d3.mouse(this);
-                    classLength = d3.select(this).attr("class").length;
-                    constructor = d3.select(this).attr("class").substring(0, classLength-4);
-                    year = d3.select(this).attr("class").substring(classLength-4, classLength);
-                    text = "[Points: " + d.totalPoints.toFixed(2) + ", Constructor: " + constructor.replace(/_/g, ' ') + "]";
-                    drawOnMouseOverLabel(coords, barSvg, text, colors(constructor), year, minYear, maxYear);
-                });
-                   
-                bar.on("mouseout", function(d) {      
-                    document.body.style.cursor = "default";
-                    if (nBarsClicked == 0) {
-                        d3.select(this)
-                            .style("stroke", "none");
-                    }
-                    // Removes the label with information about the bar
-                    d3.select(".rect_label")
-                        .remove();
-                });
-                
-                bar.on("click", function(d) {
-                    if (d.totalPoints == 0) {
-                        return;
-                    }
-                    
-                    // Selects the bar clicked, and also the other bars in the same year
-                    year = d3.select(this).attr("class").substring(classLength-4, classLength);
-                    selection = d3.selectAll("[class$='" + year + "']");
-                    
-                    // Calculates the total number of points to add/remove to the average
-                    points = selection.data();
-                    totalPoints = 0;
-                    for (i = 0; i < points.length; i++) {
-                        totalPoints += points[i].totalPoints;
-                    }
-                    
-                    // Gives them a stroke if they have been selected for the first time, otherwise removes the previous stroke
-                    add = true; // Flag that indicates if to increase or decrease the total number of points across the season 
-                    selection
-                        .style("stroke", function(d) {
-                            currentClass = d3.select(this).attr("class");
-                            if (!barsClicked.includes(currentClass)) {
-                                barsClicked.push(currentClass);
-                                return "black";
-                            }
-                            else {
-                                add = false;
-                                index = barsClicked.indexOf(currentClass);
-                                barsClicked.splice(index, 1);
-                                return "none";
-                            }
-                        });
-                        
-                    // Calculates the total number of points to add/remove to the cumulative points across the seasons
-                    points = selection.data();
-                    if (add) {
-                        nBarsClicked += 1;
-                        for (i = 0; i < points.length; i++) {
-                            cumulativePoints += points[i].totalPoints;
-                        }
-                    }
-                    else {
-                        nBarsClicked -= 1;
-                        for (i = 0; i < points.length; i++) {
-                            cumulativePoints -= points[i].totalPoints;
-                        }
-                    }
-                    
-                    /* DEBUG
-                    console.log("[" + cumulativePoints + ", " + nBarsClicked + "]"); */
-                    
-                    // Adds/update a mean line in the total points bar chart
-                    d3.select(".mean").remove()
-                    
-                    if (nBarsClicked > 0) {
-                        mean = cumulativePoints/nBarsClicked;
-                        barSvg.append("line")
-                            .attr("class", "mean")
-                            .attr("x1", 0)
-                            .attr("y1", y(mean))
-                            .attr("x2", chart_dimensions.width)
-                            .attr("y2", y(mean))
-                            .style("stroke", "red")
-                            .style("stroke-width", 3)
-                            .on("mouseover", function(d) {
-                                coords = d3.mouse(this);
-                                text = "[Mean: " + mean.toFixed(2) + ", Sum: " + cumulativePoints.toFixed(2) + "] ";
-                                drawOnMouseOverLabel(coords, barSvg, text, "red", year, minYear, maxYear);
-                            })
-                            .on("mouseout", function(d) {
-                                d3.select(".rect_label")
-                                    .remove();
-                            });
-                    }
-                });
-            }        
-        }
-        
-        // Draws the legend for the graph
-        drawPointsAchievedLegend(data, data2);      
-    }
-        
-    // Draws the legend for the points bar graph
-    function drawPointsAchievedLegend(data, data2) {
-        // Erase previous data
-        svgLegend.selectAll('*').remove();
-        
-        svgLegend.append("text")
-            .style("font", "12px times")
-            .attr("y", 5)
-            .text("Click to filter data!");
-        
-        // Prepares the space/layout for the legend
-        sizeSquare = 10;
-        legend = svgLegend.selectAll("legend")
-            .data(constructors)
-            .enter()
-            .append("g")
-            .attr("class", "legend")
-			.attr("transform", function(d,i){
-                return "translate(0,"+((i+1)*sizeSquare+i*5)+")";
-            });
-        
-        // Draws the small colored rectangles
-        legend.append("rect")
-			.attr("width", sizeSquare)
-			.attr("height", sizeSquare)
-            .attr("class", function(d) {
-                return "rect"+d;
-            })
-			.style("fill", function(d){
-                if (!constructorsDisabled.includes(d)) {
-                    return colors(d);
-                }
-                    return "grey";
-			});
-            
-        // Writes the text near the small colored rectangles
-        legend.append("text")
-            .attr("class", function(d) {
-                return "text"+d;
-            })
-            .attr("x", sizeSquare+5)
-            .attr("y", (sizeSquare/2))
-            .attr("dy", ".35em")
-            .style("font", "12px times")
-            .style("fill", function(d) {
-                if (!constructorsDisabled.includes(d)) {
-                    return "black";
-                }
-                return "grey";
-            })
-            .text(function(d) {
-                return d.replace(/_/g, ' ');
-            });
-        
-         
-            
-        // Add input events to the legend
-        legend
-            .on("mouseover", function(d) {
-                // Highlights the entry in the legend
-                document.body.style.cursor = "pointer";
-                d3.select(".rect"+d)
-                    .attr("stroke", "black");
-                d3.select(".text"+d)
-                    .attr("text-decoration", "underline overline");
-                
-                // Highlights the bars
-                if (nBarsClicked == 0) {
-                    // First in the points chart
-                    barSvg.selectAll("[class*=" + d + "]")
-                        .style("stroke", "black"); 
-                    // Then in the teammates chart
-                    cmpSvg.selectAll("[class^=rect]")
-                        .style("stroke", function() {
-                            if (d3.select(this).attr("id") == d) {
-                                hoveredDriver = d3.select(this).attr("class").substring(10, d3.select(this).attr("class").length);
-                                if (!driversHovered.includes(hoveredDriver)) {
-                                    driversHovered.push(hoveredDriver);
-                                }
-                                return "black";
-                            }
+            // Adds controls to the game. Auxiliary function of createGameplay()
+            function setControls() {
+                document.onkeydown = function() { 
+                    if (event.keyCode == 65) { // The player presses 'a': the car needs to turn left
+                        leftOrRight = 1; }
+                    else if (event.keyCode == 68) { // The player presses 'd': the car needs to turn right
+                        leftOrRight = 2; } 
+                    else if (event.keyCode == 86 && pause == false && crash == false && menu == false) { // The player presses 'v': switches between the two cameras
+                        if (cockpit == true) {
+                            camera.position.set(-5.6, 5.1, 2.7);
+                            document.getElementById("hud").style.visibility = "visible";
+                            cockpit = false; }
+                        else {
+                            camera.position.set(0.6, 2.1, -0.3);
+                            document.getElementById("hud").style.visibility = "hidden";
+                            cockpit = true; } }
+                    else if (event.keyCode == 80 && pause == false && crash == false && menu == false) { // The player presses 'p' while playing: the game is paused
+                        pause = true;
+                        document.title = "Formula Driver - Paused";
+                        cancelAnimationFrame(gameplayAnimation); }
+                    else if (event.keyCode == 80 && pause == true) { // The player presses 'p' when the pause is on: the game is resumed
+                        pause = false;
+                        document.title = "Formula Driver - In Game";
+                        gameplayAnimation = requestAnimationFrame(animateGameplay); } };
                             
-                            return d3.select(this).style("stroke");
-                        }); 
-                }
-            })
-            .on("mouseout", function(d) {
-                // Restores everything
-                document.body.style.cursor = "default";
-                d3.select(".rect"+d)
-                    .attr("stroke", "none");
-                d3.select(".text"+d)
-                    .attr("text-decoration", "none");
-                if (nBarsClicked == 0) {
-                    barSvg.selectAll("[class*=" + d + "]")
-                        .style("stroke", "none"); 
-                    cmpSvg.selectAll("[class^=rect]")
-                        .style("stroke", "white");
-                }
-                driversHovered = [];
-            })
-            .on("click", function(d) {
-                // Hides the data regarding that constructor in all the charts
-                if (!constructorsDisabled.includes(d)) {
-                    if (constructorsDisabled.length == constructors.length-1) {
-                        alert("Can't remove all constructors!");
-                        return;
-                    }
-                    if ((driversHovered.length + teammatesDisabled.length) == teammates.length-1) {
-                        alert("Removing this constructor may remove all teammates!");
-                        return;
-                    }
-                    constructorsDisabled.push(d);
-                    
-                    // Disables the entry in the constructor legend
-                    d3.select(".rect"+d)
-                        .style("fill", "grey");
-                    d3.select(".text"+d)
-                        .style("fill", "grey");  
-                }
-                // Restores the data regarding that constructor in all the charts
-                else {
-                    var index = constructorsDisabled.indexOf(d);
-                    constructorsDisabled.splice(index, 1);
-                    lastConstructorEnabled = d;
-                    
-                    // Restores the entry in the legend
-                    d3.select(".rect"+d)
-                        .style("fill", colors(d));
-                    d3.select(".text"+d)
-                        .style("fill", "black");
-                }
+                document.onkeyup = function() { 
+                    if (event.keyCode == 65 || event.keyCode == 68) { // The player stops turning
+                        leftOrRight = 0; } };
+
+                // EXTRA: MOBILE CONTROLS FOR MOVEMENT SO I CAN TEST THE GAME ON MY PHONE
+                document.ontouchstart = function() {
+                    if (event.changedTouches[0].pageX < window.innerWidth/2) {
+                        leftOrRight = 1; }
+                    else if (event.changedTouches[0].pageX > window.innerWidth/2) {
+                        leftOrRight = 2; } };
                 
-                // Refresh the data in the charts
-                plotPointsAchieved(data, data2);
-                plotComparisons(data, data2);
-                maxValueDNF = 0;
-                minYearSelectedDNF = minYear;
-                maxYearSelectedDNF = maxYear;
-                minYearSelectedCons = minYear;
-                maxYearSelectedCons = maxYear;
-                drawDNFTimeSlider(data);
-                plotDNF(data, minYearSelectedDNF, maxYearSelectedDNF, selectedTrackDNF);
-                drawConsistencyTimeSlider(data);
-                plotConsistency(data, minYearSelectedCons, maxYearSelectedCons, selectedTrackCons);
-                plotPCA(data, data2);
-            });          
-    }
-    
-    // Prepares the layout for the comparisons with teammates chart
-    function prepareComparisons(data, data2) {
-        // Initializes the div that contains the svg area for the comparisons   
-        svgCmpDiv = document.createElement('div');
-        svgCmpDiv.id = "comparisons";
-        svgCmpDiv.innerHTML = "<b>Wins/Losses Against Teammates</b><br>";
-        svgCmpDiv.onmouseover = function() {
-            writeOnAbout(2);
-        }
-        wrapper.append(svgCmpDiv); 
-        
-        // Initalizes an empty svg for the points bars
-        cmpSvg = d3.select('#comparisons')
-            .append('svg')
-                .attr("width", container_dimensions.width)
-                .attr("height", container_dimensions.height)
-                //.style("background-color", "red")
-            .append("g")
-                .attr("transform", "translate(" + margins.left + "," + margins.top + ")")
-                .attr("id", "bargraph");
-        
-        // Adds radios button in order to switch between total points and average points per race
-        optionsDiv = document.createElement('div');
-        svgCmpDiv.appendChild(optionsDiv);
-        optionsDiv.style.fontSize = "14px";
-        optionsDiv.innerHTML = "Show: ";
-        winsRacesButton = document.createElement('input');
-        winsRacesButton.type = 'radio';
-        winsRacesButton.name = 'races-or-quali';
-        winsRacesButton.id = 'show-races';
-        winsRacesButton.value = "races";
-        label = document.createElement('label');
-        label.innerHTML = "Wins In Races";
-        optionsDiv.appendChild(winsRacesButton);
-        optionsDiv.appendChild(label);
-        optionsDiv.innerHTML += "   ";
-
-        winsQualiButton = document.createElement('input');
-        winsQualiButton.type = 'radio';
-        winsQualiButton.name = 'races-or-quali';
-        winsQualiButton.id = 'show-quali';
-        winsQualiButton.value = "quali";
-        label = document.createElement('label');
-        label.innerHTML = "Wins In Qualifying";
-        optionsDiv.appendChild(winsQualiButton);
-        optionsDiv.appendChild(label);
-        document.getElementById("show-races").checked = true;
-        
-         document.getElementById('show-races').onclick = function() {
-            showWinsInRaces = true;
-            plotComparisons(data, data2);
-        }
-        document.getElementById('show-quali').onclick = function() {
-            showWinsInRaces = false;
-            plotComparisons(data, data2);
-        }
-        
-        // Initializes the div for the points bar graph legend
-        svgCmpLegendDiv = document.createElement('div');
-        svgCmpLegendDiv.innerHTML = "Drivers<br>";
-        svgCmpLegendDiv.id = "cmplegendtable";
-        svgCmpLegendDiv.onmouseover = function() {
-            writeOnAbout(2);
-        }
-        wrapper.append(svgCmpLegendDiv);
-        
-        // Initializes the empty svg for the bar graph legend
-        svgCmpLegend = d3.select('#cmplegendtable')
-            .append('svg')
-                .attr("width", legend_width)
-                .attr("height", container_dimensions.height)
-                .attr("class", "svgCmp")
-                // .style("background-color", "red")
-                .append("g")
-                    .attr("transform", "translate(" + 0 + "," + margins.top/4 + ")")
-                    .attr("id","cmplegendtable");
-        
-        // Plots a bar graph that shows the comparisons with teammates
-        plotComparisons(data, data2);
-    }
-    
-    // Plots a bar graph that shows the comparisons with teammates
-    function plotComparisons(data, data2) {
-        // Erase previous data
-        cmpSvg.selectAll('*').remove();
-        
-        // Finds the relevant data to plot
-        relevantData = [];
-        if (showWinsInRaces) {
-            relevantData = findWinsAgainstTeammates(data);
-        }
-        else {
-            relevantData = findWinsAgainstTeammates(data2);
-        }
-        
-        // Initializes the x scale and finds the range of seasons
-        x = d3.scaleBand()
-            .domain(relevantData.map(function(d) {
-                return d.key.substring(0, 4);
-            }))
-            .range([0, chart_dimensions.width])
-            .padding(.5);
-        
-        // Initializes the y scale and finds the biggest number of wins/losses in order to set up the scale
-        maxWins = 0;
-        previousYear = 0;
-        topWins = 0;
-        bottomWins = 0;
-        for (i = 0; i < relevantData.length; i++) { // Cycles through the years
-            year = relevantData[i].key.substring(0, 4); // Gets current year
-            if (year != previousYear) { // If it is a new year (meaning no new teammates in the same year) the number of wins is resetted.
-                previousYear = year;
-                topWins = 0;
-                bottomWins = 0;
-            }
-            topWins += relevantData[i].value.selectedDriverWins;
-            if (topWins > maxWins) {
-                maxWins = topWins;
-            }
-            bottomWins += relevantData[i].value.teammateWins;
-            if (bottomWins > maxWins) {
-                maxWins = bottomWins;
-            }
-        }
-        if (maxWins == 0) {
-            maxWins = 1;
-        }
-        yTop = d3.scaleLinear()
-            .domain([maxWins, 0])
-            .range([0, chart_dimensions.height/2]);
-        
-        yBottom = d3.scaleLinear()
-            .domain([0, maxWins])
-            .range([0, chart_dimensions.height/2]);
+                document.ontouchend = function() {
+                    leftOrRight = 0; }; }
             
-        // Initializes the axis
-        xAxis = d3.axisBottom(x).ticks().tickFormat(d3.format("d"));
-        yTopAxis = d3.axisLeft(yTop).ticks(4).tickFormat(d3.format("d"));
-        yBottomAxis = d3.axisLeft(yBottom).ticks(4).tickFormat(d3.format("d"));
-        
-        // Appends the x axis
-        cmpSvg.append("g")
-            .attr("class","x_axis")
-            .attr("transform", "translate(0,"+ (chart_dimensions.height) +")")
-            .call(xAxis);
-        cmpSvg.append("text")
-            .attr("class","label")
-            .attr("x", chart_dimensions.width)
-            .attr("y", chart_dimensions.height+(margins.bottom-10))
-            .style("text-anchor","end")
-            .text("Seasons");
-        
-        // Appends the top y axis
-        cmpSvg.append("g")
-            .attr("class","yTop_axis")
-            .call(yTopAxis)
-        cmpSvg.append("text")
-            .attr("class","label")
-            .attr("transform","rotate(-90)")
-            .attr("y", 6)
-            .attr("dy","-2.5em")
-            .style("text-anchor","end")
-            .style("font", "12px times")
-            .text(function(d) {
-                if (showWinsInRaces) {
-                    return "Wins In Races";
-                }
-                else {
-                    return "Wins In Qualy";
-                }
-            });
-        
-        // Appends the bottom y axis
-        cmpSvg.append("g")
-            .attr("transform", "translate(0," + (chart_dimensions.height)/2 + ")")
-            .attr("class","yBottom_axis")
-            .call(yBottomAxis); 
-        cmpSvg.append("text")
-            .attr("class","label")
-            .attr("transform", "translate(0," + (chart_dimensions.height) + ")" + "rotate(-90)")
-            .attr("y", 6)
-            .attr("dy","-2.5em")
-            .style("text-anchor","start")
-            .style("font", "12px times")
-            .text(function(d) {
-                if (showWinsInRaces) {
-                    return "Losses In Races";
-                }
-                else {
-                    return "Losses In Qualy";
-                }
-            });
-        
-        // Plot the data
-        if (!teammates.includes(selectedDriver)) {
-            teammates.push(selectedDriver);
-        }
-        teammatesShowing = [];
-        teammatesShowing.push(selectedDriver);
-        previousYear = 0; // Previous year found while cycling through the data
-        barBelowTopY = 0; // Size of the bar on the top Y if there's one below the current one
-        barAboveBottomY = 0; // Size of the bar on the bottom Y if there's one above the current one
-        for (i = 0; i < relevantData.length; i++) {
-            year = relevantData[i].key.substring(0, 4);
-            
-            // Check if there are more teammates in the same year (aka if there are already bars in place)
-            if (year != previousYear) {
-                previousYear = year;
-                barBelowTopY = 0;
-                barAboveBottomY = 0;
-            }
-            else {
-                barBelowTopY += relevantData[i-1].value.selectedDriverWins;
-                barAboveBottomY += relevantData[i-1].value.teammateWins;
-            }
-            
-            // Refresh the list of teammates
-            teammate = relevantData[i].key.substring(5, relevantData[i].key.length);
-            if (!teammates.includes(teammate)) {
-                teammates.push(teammate);
-            }
-            if (!teammatesShowing.includes(teammate)) {
-                teammatesShowing.push(teammate);
-            }
-            
-            // Plot selected driver and teammate
-            for (j = 0; j < 2; j++) {           
-                bar = cmpSvg.selectAll("bar")
-                    .data([relevantData[i].value]) // The [ ] parenthesis turn the object in an array
-                    .enter()
-                    .append("rect")
-                        .attr("id", function(d) {
-                            return d.constructor;
-                        })
-                        .attr("class", function(d) {
-                            if (j == 0) { // Index 0 means this is the selected driver
-                                return "rect0" + relevantData[i].key;
-                            }
-                            else { // Index 1 means this is the teammate
-                                return "rect1" + relevantData[i].key;
-                            }
-                        })
-                        .style("fill", function(d) {
-                            if (j == 0) {
-                                return colorsTeammates(selectedDriver);
-                            }
-                            else {
-                                return colorsTeammates(teammate);
-                            }
-                        })
-                        .style("stroke", "white")
-                        .style("stroke-width", 1)
-                        .attr("x", x(year)) 
-                        .attr("width", x.bandwidth)
-                        .attr("y", yTop(0))
-                        .attr("height", 0);
+            // Creates the gameplay scene coming from the menu
+            function createGameplay() {
+                document.title = "Formula Driver - In Game"; // Change the title of the web page
+                menu = false;
                 
-                // Handles animation
-                bar.transition()
-                    .duration(animationsSpeed)
-                    .attr("y", function(d) {
-                        if (j == 0) {
-                            return yTop(d.selectedDriverWins + barBelowTopY);
-                        }
-                        else {
-                            return yTop(-barAboveBottomY);
-                        }
-                    })
-                    .attr("height", function(d) {
-                        if (j == 0) {
-                            if (barBelowTopY == 0) {
-                                return chart_dimensions.height/2 - yTop(d.selectedDriverWins);
-                            }
-                            else {
-                                return yTop(barBelowTopY) - yTop(d.selectedDriverWins + barBelowTopY);
-                            }
-                        }
-                        else {
-                            return yBottom(d.teammateWins);
-                       }
-                    });
-                    
-              
-                // Handles inputs
-                bar.on("mouseover", function(d) {
-                    // Outlines the bar
-                    d3.select(this)
-                        .style("stroke", "black");
+                cancelAnimationFrame(menuAnimation); // Stops the spinning animation of the menu
                 
-                    // Draws a label with information about the bar
-                    coords = d3.mouse(this);
-                    id = d3.select(this).attr("class");
-                    flagTop = id.substring(4, 5);
-                    year = id.substring(5, 9);
-                    teammate = id.substring(10, id.length);
-                    text = "";
-                    color = "";
-                    if (flagTop == "0") {     
-                        text = "[Wins against " + teammate.replace(/_/g, ' ') + ": " + d.selectedDriverWins + "] ";
-                        color = colorsTeammates(selectedDriver);
-                    }
-                    else {
-                        text = "[Losses against " + teammate.replace(/_/g, ' ') + ": " + d.teammateWins + "] ";
-                        color = colorsTeammates(teammate);
-                    }
-                    drawOnMouseOverLabel(coords, cmpSvg, text, color, year, minYear, maxYear);
-                });
+                models.getObjectByName("Human").visible = false; // Renders invisible the parts that are not needed in gameplay
+                models.getObjectByName("Pit Road").visible = false;
+                models.getObjectByName("Gameplay Road").visible = true; // Renders visible the parts that are needed in gameplay
+                models.getObjectByName("Torso Cockpit").visible = true;
+                models.getObjectByName("Left Hand").visible = true;
+                models.getObjectByName("Right Hand").visible = true;
                 
-                bar.on("mouseout", function(d) {
-                    // Restores everything
-                    d3.select(this)
-                        .style("stroke", "white");
-                    d3.select(".rect_label")
-                        .remove();
-                });             
-            }
-        }  
-
-        // Refresh the list of filtered out teammates
-        teammatesDisabled = [];
-        for (i = 1; i < teammates.length; i++) {
-            if (!teammatesShowing.includes(teammates[i])) {
-                teammatesDisabled.push(teammates[i]);
-            }
-        }
-        
-        // Draws the legend
-        drawComparisonLegend(data, data2, teammates);
-    }
-    
-    // Draws the legend for the comparison graph
-    function drawComparisonLegend(data, data2, teammates) {
-        // Erase previous data
-        svgCmpLegend.selectAll('*').remove();
-        
-        svgCmpLegend.append("text")
-            .style("font", "12px times")
-            .attr("y", 5)
-            .text("Click to filter data!");
-        
-        // Resize the legend if there too many entries
-        if (teammates.length > 15) {
-            d3.select(".svgCmp").attr("height", (teammates.length*sizeSquare*1.5)+10);
-        }
-        
-        // Prepares the space/layout for the legend
-        sizeSquare = 10;
-        legend = svgCmpLegend.selectAll("legend")
-            .data(teammates)
-            .enter()
-            .append("g")
-            .attr("class", "legend")
-			.attr("transform", function(d,i){
-                return "translate(0,"+((i+1)*sizeSquare+i*5)+")";
-            });
-        
-        // Draws the small colored rectangles
-        legend.append("rect")
-			.attr("width", sizeSquare)
-			.attr("height", sizeSquare)
-            .attr("class", function(d) {
-                return "rect"+d;
-            })
-			.style("fill", function(d){
-                if (!teammatesDisabled.includes(d)) {
-                    return colorsTeammates(d);
-                }
-                return "grey";
-			});
-            
-        // Writes the text near the small colored rectangles
-        legend.append("text")
-            .attr("class", function(d) {
-                return "text"+d;
-            })
-            .attr("x", sizeSquare+5)
-            .attr("y", sizeSquare/2)
-            .attr("dy", ".35em")
-            .style("font", "12px times")
-            .style("fill", function(d) {
-                if (!teammatesDisabled.includes(d)) {
-                    return "black";
-                }
-                return "grey";
-            })
-            .text(function(d) {
-                return d.replace(/_/g, ' ');
-            });
-        
-        // Add input events to the legend
-        legend
-            .on("mouseover", function(d) {   
-                document.body.style.cursor = "pointer";
-                onMouseOverDriver(d); 
-            })
-            .on("mouseout", function(d) {
-                document.body.style.cursor = "default";
-                onMouseOutDriver(d);
-            })
-            .on("click", function(d) {
-                onClickDriver(d, data, data2);
-            });
-    }
-    
-    // Prepares the layout for the chart that displays the causes of DNFs
-    function prepareDNF(data) {
-        // Initializes the div that contains the time slider and svg area for the dnf 
-        var svgDNFDiv = document.createElement('div');
-        svgDNFDiv.id = "dnf";
-        svgDNFDiv.innerHTML = "<b>DNFs' Causes</b><br>";
-        svgDNFDiv.onmouseover = function() {
-            writeOnAbout(3);
-        }
-        bottomWrapper.append(svgDNFDiv); 
-        
-        // Initializes an empty svg for the time slider
-        svgDNFTimeSliderDiv = document.createElement('div');
-        svgDNFTimeSliderDiv.id = "dnftimeslider";
-        svgDNFDiv.appendChild(svgDNFTimeSliderDiv);
-        dnfTimeSliderSvg = d3.select('#dnftimeslider')
-            .append('svg')
-                .attr("width", small_container_dimensions.width)
-                .attr("height", timeslider_height)
-                //.style("background-color", "red")
-            .append("g")
-                .attr("transform", "translate(" + (margins.left) + "," + margins.top + ")")
-                .attr("id", "dnftimeslider");
-        
-        // Adds the track selector with input event
-        var svgDNFDiv2 = document.createElement('div');
-        svgDNFDiv.appendChild(svgDNFDiv2);
-        svgDNFDiv.style.fontSize = "14px";
-        svgDNFDiv2.appendChild(document.createTextNode("Show DNFs from: "));
-        var selectTrack = document.createElement('select');
-        selectTrack.id = "select-track-dnf";
-        selectTrack.style.width = "150px";
-        var defaultTrackOption = document.createElement('option');
-        defaultTrackOption.value = 0;
-        defaultTrackOption.innerHTML = "- EVERY TRACK -";
-        selectTrack.appendChild(defaultTrackOption);
-        svgDNFDiv2.appendChild(selectTrack);
-        document.getElementById("select-track-dnf").onchange = function() { 
-            selectedTrackDNF = this.value;
-            plotDNF(data, minYearSelectedDNF, maxYearSelectedDNF, selectedTrackDNF);
-        }
-        
-        // Initalizes an empty svg for the lollipop chart
-        dnfSvg = d3.select('#dnf')
-            .append('svg')
-                .attr("width", small_container_dimensions.width)
-                .attr("height", small_container_dimensions.height - 50)
-                //.style("background-color", "red")
-            .append("g")
-                .attr("transform", "translate(" + (margins.left+20) + "," + margins.top + ")")
-                .attr("id", "dnf");
-        
-        // Text under the lollipop graph
-        var textDiv = document.createElement('div');
-        svgDNFDiv.appendChild(textDiv);
-        labelTotalRacesDNF = document.createElement('label');
-        labelTotalRacesDNF.style.fontSize = "14px";
-        labelTotalRacesDNF.innerHTML = "Number of finishes: ";
-        textDiv.appendChild(labelTotalRacesDNF);
-              
-        // Plots the timeslider and lollipop graph that displays data about the causes of DNFs
-        minYearSelectedDNF = minYear;
-        maxYearSelectedDNF = maxYear;
-        drawDNFTimeSlider(data);
-        plotDNF(data, minYearSelectedDNF, maxYearSelectedDNF, selectedTrackDNF);
-    }
-    
-    // Draws a time slider for the DNF lollipop chart
-    function drawDNFTimeSlider(data) {
-        // Erase previous data
-        dnfTimeSliderSvg.selectAll('*').remove();
-        
-        // Creates and adds the time slider
-        var sliderDNF = d3.sliderBottom()
-            .min(minYear)
-            .max(maxYear)
-            .width(small_chart_dimensions.width)
-            .tickFormat(d3.format('d'))
-            .ticks(5)
-            .default([minYear, maxYear])
-            .step(1)
-            .fill('#2196f3')
-            .on('onchange', val => {
-                if (val[0] > val[1]) {
-                    var swap = val[1];
-                    val[1] = val[0];
-                    val[0] = swap;
-                }
-                minYearSelectedDNF = val[0];
-                maxYearSelectedDNF = val[1];
-                plotDNF(data, minYearSelectedDNF, maxYearSelectedDNF, selectedTrackDNF);
-            });
-        dnfTimeSliderSvg.call(sliderDNF); 
-    }
-        
-    // Plots the lollipop graph that displays data about the causes of DNFs
-    function plotDNF(data, selectedMinYear, selectedMaxYear, selectedTrack) {
-        // Erase previous data
-        dnfSvg.selectAll('*').remove();
-        
-        // Finds the relevant data to plot and sorts it
-        relevantDataDNF = findDNFs(data, selectedMinYear, selectedMaxYear, selectedTrack);
-        sortedRelevantDataDNF = relevantDataDNF.slice(2, relevantDataDNF.length);
-        sortedRelevantDataDNF.sort(function(x, y) {
-            return d3.descending(x.value, y.value);
-        });
-        
-        // Initializes the x scale
-        for (i = 0; i < sortedRelevantDataDNF.length; i++) {
-            if (sortedRelevantDataDNF[i].value > maxValueDNF) {
-                maxValueDNF = sortedRelevantDataDNF[i].value;
-            }
-        }
-        if (maxValueDNF == 0) {
-            maxValueDNF = 1;
-        }
-        xDNF = d3.scaleLinear()
-            .domain([0, maxValueDNF])
-            .range([0, small_chart_dimensions.width])
-
-        // Initializes the y scale;
-        yDNF = d3.scaleBand()
-            .domain(sortedRelevantDataDNF.map(function(d) {
-                return d.key;
-             }))
-            .range([0, small_chart_dimensions.height-30])
-            .padding(1);
-        
-        // Initializes the axis
-        xAxis = d3.axisBottom(xDNF).ticks().tickFormat(d3.format("d"));
-        yAxis = d3.axisLeft(yDNF).ticks();
-        
-        // Appends the x axis
-        dnfSvg.append("g")
-            .attr("class","xDNF_axis")
-            .attr("transform", "translate(0,"+(small_chart_dimensions.height-30)+")")
-            .call(xAxis);
-        
-        // Appends the y axis
-        dnfSvg.append("g")
-            .attr("class","yDNF_axis")
-            .call(yAxis)
-        
-        sortedRelevantResultsDNF = relevantDataDNF.slice(2, relevantDataDNF.length);
-        sortedRelevantResultsDNF.sort(function(x, y) {
-            return d3.descending(x.value, y.value);
-        });
-        
-        // Plot the lines
-        lines = dnfSvg.selectAll("myline")
-            .data(sortedRelevantDataDNF)
-            .enter()
-            .append("line")
-                .attr("x1", xDNF(0))
-                .attr("x2", xDNF(0))
-                .attr("y1", function(d) { 
-                    return yDNF(d.key); 
-                })
-                .attr("y2", function(d) { 
-                    return yDNF(d.key); 
-                })
-                .style("stroke", "black")
-                .style("stroke-width", 2);
-        
-        // Plot the circles
-        circles = dnfSvg.selectAll("mycircle")
-            .data(sortedRelevantDataDNF)
-            .enter()
-            .append("circle")
-                .attr("cx", function(d) { 
-                    return xDNF(d.value); 
-                })
-                .attr("cy", function(d) { 
-                    return yDNF(d.key); 
-                })
-                .attr("r", "4")
-                .style("fill", "#69b3a2")
-                .style("opacity", 0)
-                .style("stroke", "black") 
-        
-        // Handles the animations
-        lines.transition()
-            .duration(animationsSpeed)
-            .attr("x1", function(d) { 
-                    return xDNF(d.value);
-                });   
-        circles.transition()
-            .duration(animationsSpeed)
-            .delay(animationsSpeed-500)
-            .style("opacity", 1);
-        
-        // Handles the inputs
-        circles.on("mouseover", function(d) {
-            d3.select(this).attr("r", "6");
-            coords = d3.mouse(this);
-            ratio = ((d.value)*100)/relevantDataDNF[0].value;
-            text = "[" + d.key.substring(0, 3).toUpperCase() + ": " + d.value + " (" + ratio.toFixed(2) + "% of the races)] ";
-            drawOnMouseOverLabel(coords, dnfSvg, text, "black", d.value, 0, maxValueDNF);
-        });
-        circles.on("mouseout", function(d) {
-            d3.select(this).attr("r", "4");
-            d3.select(".rect_label")
-                .remove();
-        });
-        
-        // Adds the stats under the graph
-        finishesRatio = (relevantDataDNF[1].value*100)/relevantDataDNF[0].value;
-        labelTotalRacesDNF.innerHTML = "<b>Finishes</b>: " + relevantDataDNF[1].value + " (" + finishesRatio.toFixed(2) + "%)";
-        sumDNF = sortedRelevantDataDNF[0].value + sortedRelevantDataDNF[1].value + sortedRelevantDataDNF[2].value;
-        dnfRatio = (sumDNF*100)/relevantDataDNF[0].value;
-        labelTotalRacesDNF.innerHTML += "&nbsp&nbsp&nbsp<b>DNFs</b>: " +  sumDNF + " (" + dnfRatio.toFixed(2) + "%)";
-    }
-    
-    // Prepares the layout for the chart that displays the consistency of the placements
-    function prepareConsistency(data) {
-        // Initializes the div that contains the time slider and svg area for the placements
-        svgConsDiv = document.createElement('div');
-        svgConsDiv.id = "consistency";
-        svgConsDiv.innerHTML = "<b>Placements' Consistency On Finishes</b><br>";
-        svgConsDiv.onmouseover = function() {
-            writeOnAbout(4);
-        }
-        bottomWrapper.append(svgConsDiv); 
-        
-        // Initializes an empty svg for the time slider
-        svgConsTimeSliderDiv = document.createElement('div');
-        svgConsTimeSliderDiv.id = "constimeslider";
-        svgConsDiv.appendChild(svgConsTimeSliderDiv);
-        consTimeSliderSvg = d3.select('#constimeslider')
-            .append('svg')
-                .attr("width", small_container_dimensions.width)
-                .attr("height", timeslider_height)
-                //.style("background-color", "red")
-            .append("g")
-                .attr("transform", "translate(" + (margins.left) + "," + margins.top + ")")
-                .attr("id", "constimeslider");
-        
-        // Adds the track selector with input event
-        var svgConsDiv2 = document.createElement('div');
-        svgConsDiv.appendChild(svgConsDiv2);
-        svgConsDiv.style.fontSize = "14px";
-        svgConsDiv2.appendChild(document.createTextNode("Show placements from: "));
-        var selectTrack = document.createElement('select');
-        selectTrack.id = "select-track-cons";
-        selectTrack.style.width = "150px";
-        var defaultTrackOption = document.createElement('option');
-        defaultTrackOption.value = 0;
-        defaultTrackOption.innerHTML = "- EVERY TRACK -";
-        selectTrack.appendChild(defaultTrackOption);
-        svgConsDiv2.appendChild(selectTrack);
-        document.getElementById("select-track-cons").onchange = function() { 
-            selectedTrackCons = this.value;
-            plotConsistency(data, minYearSelectedCons, maxYearSelectedCons, selectedTrackCons);
-        }
-        
-        // Initalizes an empty svg for box plot
-        consSvg = d3.select('#consistency')
-            .append('svg')
-                .attr("width", small_container_dimensions.width)
-                .attr("height", (small_container_dimensions.height/2)+40)
-                //.style("background-color", "red")
-            .append("g")
-                .attr("transform", "translate(" + (margins.left) + "," + margins.top + ")")
-                .attr("id", "cons");
-        
-        // Text under the boxplot graph
-        var textDiv = document.createElement('div');
-        svgConsDiv.appendChild(textDiv);
-        labelTotalRacesCons = document.createElement('label');
-        labelTotalRacesCons.style.fontSize = "14px";
-        labelTotalRacesCons.innerHTML = "Number of finishes: ";
-        textDiv.appendChild(labelTotalRacesCons);
- 
-        // Draws the time slider and the boxplot
-        minYearSelectedCons = minYear;
-        maxYearSelectedCons = maxYear;
-        drawConsistencyTimeSlider(data);
-        plotConsistency(data, minYearSelectedCons, maxYearSelectedCons, selectedTrackCons);
-    }
-    
-    // Draws a time slider fot the consistency plot box
-    function drawConsistencyTimeSlider(data) {
-        // Erase previous data
-        consTimeSliderSvg.selectAll('*').remove();
-       
-        // Creates and adds the time slider
-        var sliderConsistency = d3.sliderBottom()
-            .min(minYear)
-            .max(maxYear)
-            .width(small_chart_dimensions.width)
-            .tickFormat(d3.format('d'))
-            .ticks(5)
-            .default([minYear, maxYear])
-            .step(1)
-            .fill('#2196f3')
-            .on('onchange', val => {
-                if (val[0] > val[1]) {
-                    var swap = val[1];
-                    val[1] = val[0];
-                    val[0] = swap;
-                }
-                minYearSelectedCons = val[0];
-                maxYearSelectedCons = val[1];
-                plotConsistency(data, minYearSelectedCons, maxYearSelectedCons, selectedTrackCons);
-            });
-        consTimeSliderSvg.call(sliderConsistency); 
-    }
-    
-    // Plots the plot box with the placements of the driver
-    function plotConsistency(data, selectedMinYear, selectedMaxYear, selectedTrack) {
-        // Erase previous data
-        consSvg.selectAll('*').remove();
-        
-        // Finds the relevant data
-        var relevantData = findPlacements(data, selectedMinYear, selectedMaxYear, selectedTrack);
-        var stats = relevantData.pop();
-        
-        // Adds data about circuits if not already done
-        if (flagAddCircuits == 0) {
-            var selection = document.getElementById("select-track-cons");
-            addCircuitsToSelection(selection);
-            selection = document.getElementById("select-track-dnf");
-            addCircuitsToSelection(selection);
-            flagAddCircuits = 1;
-        }
-        
-        // Initializes the x scale
-        xCons = d3.scaleLinear()
-            .domain([22, 1])
-            .range([0, small_chart_dimensions.width])
-            
-        // Initializes the axis
-        xAxis = d3.axisBottom(xCons).ticks(22).tickFormat(d3.format("d"));
-        
-        // Appends the x axis
-        consSvg.append("g")
-            .attr("class","xCons_axis")
-            .attr("transform", "translate(0,"+((small_chart_dimensions.height/2)+10)+")")
-            .call(xAxis);
-        consSvg.append("text")
-            .attr("class","label")
-            .attr("x", small_chart_dimensions.width)
-            .attr("y", ((small_chart_dimensions.height/2)+10)+(margins.bottom-10))
-            .style("text-anchor","end")
-            .text("Placements");
-        
-        // Sorts the data
-        sortedRelevantResults = relevantData.sort(function(x, y) {
-            return d3.ascending(x, y);
-        });
-        var boxHeight = 25;
-        var yCenter = 50;
-        
-        // Draws the boxplot if there is enough data
-        if (sortedRelevantResults.length >= 4) {
-            // Finds the right values for the boxplot
-            var q1 = d3.quantile(sortedRelevantResults, .25).toFixed(0);
-            var median = d3.quantile(sortedRelevantResults, .5).toFixed(0);
-            var q3 = d3.quantile(sortedRelevantResults, .75).toFixed(0);
-            var interQuantileRange = q3 - q1;
-    
-            var min = sortedRelevantResults[0];
-            var max = sortedRelevantResults[sortedRelevantResults.length-1];
-            if (isNaN(max)) {
-                max = sortedRelevantResults[sortedRelevantResults.length-2];
-            }
-
-            /* WITHOUT OUTLIERS
-            var min = Math.round(q1 - 1.5 * interQuantileRange);
-            if (min < sortedRelevantResults[0]) {
-                min = sortedRelevantResults[0];
-            }
-            var max = Math.round(q1 + 1.5 * interQuantileRange); */
-        
-            /* DEBUG
-            console.log(sortedRelevantResults);
-            console.log("q1: " + q1 +", median: " + median +", q3: " + q3 + ", Interquantile Range: " + interQuantileRange);
-            console.log("Min: " + min + ", Max: " + max); */
-
-            // Draws the main horizontal line
-            consSvg.append("line")
-                .attr("x1", xCons(max))
-                .attr("x2", xCons(max))
-                .attr("y1", yCenter)
-                .attr("y2", yCenter)
-                .attr("stroke", "black")
-                .style("opacity", 0)
-                .transition()
-                    .duration(animationsSpeed)
-                    .attr("x1", xCons(min))
-                    .style("opacity", 1);
-
-            // Draws the box
-            consSvg.append("rect")
-                .attr("x", xCons(q3))
-                .attr("y", yCenter - boxHeight/2)
-                .attr("height", boxHeight)
-                .attr("width", (xCons(q1)-xCons(q3)))
-                .style("stroke", "black")
-                .style("fill", "#69b3a2")
-                .style("opacity", 0)
-                .transition()
-                    .duration(animationsSpeed)
-                    .delay(animationsSpeed-500)
-                    .style("opacity", 1);
-
-            // Draws median, min and max vertical lines
-            consSvg.selectAll("lines")
-                .data([median, min, max])
-                .enter()
-                .append("line")
-                    .attr("class", "boxplot_line")
-                    .attr("x1", function(d) {
-                        return xCons(d);
-                    })
-                    .attr("x2", function(d) {
-                        return xCons(d);
-                    })
-                    .attr("y1", yCenter + boxHeight/2)
-                    .attr("y2", yCenter - boxHeight/2)
-                    .attr("stroke", "black")
-                    .style("opacity", 0)
-                    .transition()
-                        .duration(animationsSpeed)
-                        .delay(animationsSpeed-500)
-                        .style("opacity", 1);
-        }
-        
-        // Draws just a bunch of points
-        else {
-            consSvg.selectAll("mycircle")
-                .data(sortedRelevantResults)
-                .enter()
-                .append("circle")
-                    .attr("cx", function(d) { 
-                        return xCons(d); 
-                    })
-                    .attr("cy", function(d, i) {
-                        if (i == 0) {
-                            return yCenter;
-                        }
-                        else if (i == 1) {
-                            return (yCenter + boxHeight/2);
-                        }
-                        else {
-                            return (yCenter + boxHeight);
-                        }
-                    })
-                    .attr("r", "4")
-                    .style("fill", "#69b3a2")
-                    .style("opacity", 0)
-                    .style("stroke", "black")
-                    .on("mouseover", function(d) {
-                        d3.select(this).attr("r", "6");
-                        var coords = d3.mouse(this);
-                        var text = "[P: " + d + "] ";
-                        drawOnMouseOverLabel(coords, consSvg, text, "black", 0, 0, 0);
-                    })
-                    .on("mouseout", function(d) {
-                        d3.select(this).attr("r", "4");
-                        d3.select(".rect_label").remove();
-                    })   
-                    .transition()
-                        .duration(animationsSpeed)
-                        .style("opacity", 1);
-        }
-            
-        // Refreshes the stats
-        if (sortedRelevantResults.length >= 4) {
-            if (q1 == min && q3 == max) {
-                labelTotalRacesCons.innerHTML = "<b>Consistency</b>: 100% of placements between " + q1 + " and " + q3 + "<br>";
-            }
-            else if (q1 == min || q3 == max) {
-                labelTotalRacesCons.innerHTML = "<b>Consistency</b>: 75% of placements between " + q1 + " and " + q3 + "<br>";
-            }
-            else {
-                labelTotalRacesCons.innerHTML = "<b>Consistency</b>: 50% of placements between " + q1 + " and " + q3 + "<br>";
-            }
-        }
-        else {
-            labelTotalRacesCons.innerHTML = "Not enough data to draw a box-plot!<br>";
-        }
-        var finishesRatio = (relevantData.length*100)/stats.starts;
-        var winsRatio = (stats.wins*100)/stats.starts;
-        var podiumsRatio = (stats.podiums*100)/stats.starts;
-        labelTotalRacesCons.innerHTML += "<b>Finishes</b>: " + relevantData.length + " (" + finishesRatio.toFixed(2) + "%)";
-        labelTotalRacesCons.innerHTML += "&nbsp&nbsp&nbsp<b>Wins</b>: " + stats.wins + " (" + winsRatio.toFixed(2) + "%)";
-        labelTotalRacesCons.innerHTML += "&nbsp&nbsp&nbsp<b>Podiums</b>: " + stats.podiums + " (" + podiumsRatio.toFixed(2) + "%)";
-    }
-    
-    // Prepares the layout for the chart that displays the PCA
-    function preparePCA(data, data2) {
-        // Initializes the div that contains the svg area for the PCA  
-        svgSimDiv = document.createElement('div');
-        svgSimDiv.id = "similar-drivers";
-        svgSimDiv.innerHTML = "<b>Place In The Sport's History</b><br>";
-        svgSimDiv.onmouseover = function() {
-            writeOnAbout(5);
-        }
-        bottomWrapper.append(svgSimDiv); 
-        
-        // Initalizes an empty svg for the PCA chart
-        simSvg = d3.select('#similar-drivers')
-            .append('svg')
-                .attr("width", small_container_dimensions.width-119)
-                .attr("height", small_container_dimensions.height+25)
-                //.style("background-color", "red")
-            .append("g")
-                .attr("transform", "translate(" + (margins.left-10) + "," + margins.top + ")")
-                .attr("id", "similar-drivers");
-        
-        // Initializes the div for the legend
-        svgSimLegendDiv = document.createElement('div');
-        svgSimLegendDiv.innerHTML = "Drivers<br>";
-        svgSimLegendDiv.id = "simlegendtable";
-        svgSimLegendDiv.onmouseover = function() {
-            writeOnAbout(5);
-        }
-        var div = document.createElement('div');
-        div.append(svgSimLegendDiv);
-        bottomWrapper.append(div);
-        
-        // Text under the graph
-        var textDiv = document.createElement('div');
-        svgSimDiv.appendChild(textDiv);
-        labelAchievements = document.createElement('label');
-        labelAchievements.style.fontSize = "12px";
-        labelAchievements.innerHTML = "<b>No Driver Highlighted</b><br>";
-        labelAchievements.innerHTML += "Points: ? - Starts: ? - Finishes: ? - Podiums: ? <br>";
-        labelAchievements.innerHTML += "Wins: ? - Poles: ? - Championships ?";
-        textDiv.appendChild(labelAchievements);
-        
-        // Initializes the empty svg for the legend
-        svgSimLegend = d3.select('#simlegendtable')
-            .append('svg')
-                .attr("width", legend_width)
-                .attr("height", small_container_dimensions.height-30)
-                .attr("class", "svgSim")
-                //.style("background-color", "red")
-                .append("g")
-                    .attr("transform", "translate(" + 0 + "," + margins.top/4 + ")")
-                    .attr("id","simlegendtable");
-        
-        // Radio buttons under the legend
-        var optionsDiv = document.createElement('div');
-        div.appendChild(optionsDiv);
-        optionsDiv.style.fontSize = "14px";
-        optionsDiv.style.textAlign = "left";
-        optionsDiv.innerHTML = "Focus On: <br>";
-        
-        var everyoneButton = document.createElement('input');
-        everyoneButton.type = 'radio';
-        everyoneButton.name = 'pca-mode';
-        everyoneButton.id = 'show-everyone';
-        everyoneButton.value = "show-everyone";
-        var label = document.createElement('label');
-        label.innerHTML = "Everyone";
-        optionsDiv.appendChild(everyoneButton);
-        optionsDiv.appendChild(label);
-        optionsDiv.innerHTML += "<br>";
-        
-        var top5Button = document.createElement('input');
-        top5Button.type = 'radio';
-        top5Button.name = 'pca-mode';
-        top5Button.id = 'show-top5';
-        top5Button.value = 'show-top5';
-        label = document.createElement('label');
-        label.innerHTML = "Closest 5";
-        optionsDiv.appendChild(top5Button);
-        optionsDiv.appendChild(label);
-        optionsDiv.innerHTML += "<br>";
-        
-        var top10Button = document.createElement('input');
-        top10Button.type = 'radio';
-        top10Button.name = 'pca-mode';
-        top10Button.id = 'show-top10';
-        top10Button.value = 'show-top10';
-        label = document.createElement('label');
-        label.innerHTML = "Closest 10";
-        optionsDiv.appendChild(top10Button);
-        optionsDiv.appendChild(label);
-        optionsDiv.innerHTML += "<br>";
-        
-        var teammatesButton = document.createElement('input');
-        teammatesButton.type = 'radio';
-        teammatesButton.name = 'pca-mode';
-        teammatesButton.id = 'show-teammates';
-        teammatesButton.value = 'show-teamamtes';
-        label = document.createElement('label');
-        label.innerHTML = "Teammates";
-        optionsDiv.appendChild(teammatesButton);
-        optionsDiv.appendChild(label);
-        document.getElementById("show-everyone").checked = true;
- 
-        document.getElementById('show-everyone').onclick = function() {
-            PCAmode = 0;
-            plotPCA(data, data2);
-        }
- 
-        document.getElementById('show-top5').onclick = function() {
-            PCAmode = 1;
-            plotPCA(data, data2);
-        }
-        
-        document.getElementById('show-top10').onclick = function() {
-            PCAmode = 2;
-            plotPCA(data, data2);
-        }
-        document.getElementById('show-teammates').onclick = function() {
-            PCAmode = 3;
-            plotPCA(data, data2);
-        }
-  
-        // Check if the python script has answered back
-        if (PCAdata.length) {  
-            plotPCA(data, data2);
-        }
-        else {
-            labelAchievements.innerHTML = "PCA not available right now! The python script is offline!";
-        }
-    }
-    
-    // Plots the layout that displays the PCA
-    function plotPCA(data, data2) {
-        // Erase previous data
-        simSvg.selectAll('*').remove();
-        
-        // Gets PCA values of the selected driver
-        notableDrivers = [selectedDriver];
-        relevantData = [];
-        pca1 = 0;
-        pca2 = 0;
-        for (i = 0; i < PCAdata.length; i++) {
-            if (PCAdata[i].driver == selectedDriver) {
-                pca1 = PCAdata[i].pca1;
-                pca2 = PCAdata[i].pca2;
-                relevantData.push(PCAdata[i]);
-            }
-        }   
-        
-        // Finds the top most similar drivers
-        if (PCAmode == 1 || PCAmode == 2) {
-            var top = 0;
-            if (PCAmode == 1) {
-                top = 5;
-            }
-            else {
-                top = 10;
-            }
-            chosenIndexes = [];
-            var counter = 0;
-            var maxCloseness = 30;
-            var index = 0;
-            while (counter < top) {
-                for (i = 0; i < PCAdata.length; i++) {
-                    if (PCAdata[i].driver != selectedDriver && counter < top) {
-                        var a = pca1 - PCAdata[i].pca1;
-                        var b = pca2 - PCAdata[i].pca2;
-                        var closeness = Math.sqrt(a*a + b*b);
-                        if (closeness < maxCloseness && !chosenIndexes.includes(i)) {
-                            maxCloseness = closeness;
-                            index = i;
-                        }
-                    }
-                }
-                if (!chosenIndexes.includes(index)) {
-                    notableDrivers.push(PCAdata[index].driver);
-                    chosenIndexes.push(index);
-                    if (!teammatesDisabled.includes(PCAdata[index].driver) && !driversDisabled.includes(PCAdata[index].driver)) {
-                        relevantData.push(PCAdata[index]);
-                    }     
-                } 
-                counter += 1;
-                maxCloseness = 30;
-                index = 0;
-            }
-        }
-        // Finds the the PC values of the teammates
-        else if (PCAmode == 3) {
-            notableDrivers = teammates.slice();
-            for (i = 0; i < notableDrivers.length; i++) {
-                if (!allDrivers.includes(notableDrivers[i])) {
-                    notableDrivers.splice(i, 1);
-                 }
-            }      
-            for (i = 0; i < PCAdata.length; i++) {
-                if (PCAdata[i].driver != selectedDriver && teammates.includes(PCAdata[i].driver) && !teammatesDisabled.includes(PCAdata[i].driver)) {
-                    relevantData.push(PCAdata[i]);
-                }
-            }
-        }   
-        else {
-            for (i = 0; i < PCAdata.length; i++) {
-                if (PCAdata[i].driver != selectedDriver && !teammatesDisabled.includes(PCAdata[i].driver) && !driversDisabled.includes(PCAdata[i].driver)) {
-                    relevantData.push(PCAdata[i]);
-                }
-            }
-            notableDrivers.push("Other");
-        }
-
-        // Initializes the PCA1 and PCA2 scales
-        pca1Scale = d3.scaleLinear()
-            .domain(d3.extent(relevantData, function(d) {
-                return d.pca1;
-            }))
-            .range([0, small_chart_dimensions.width-110]);
-        pca2Scale = d3.scaleLinear()
-            .domain(d3.extent(relevantData, function(d) {
-                return d.pca2;
-            }).reverse())
-            .range([0, 200]);
-       
+                document.body.removeChild(title); // Remove all text on the menu screen
+                document.body.removeChild(options);
+                document.body.removeChild(about);
+                
+                scene.rotation.set(0, 0, 0); // Rotates the scene and the models to better fit the gameplay
+                models.rotation.set(0, 3.6, 0);
+                scene.background = new THREE.Color(0xADD8E6); // Light blue background
+                camera.position.set(0.6, 2.1, -0.3); // We set the cockpit cam
+                camera.fov = 70; // We change the FOV
+                camera.updateProjectionMatrix(); // We update the camera projection matrix so that we can apply the above changes
+                if (fogEnabled == true) { // We apply fog to the scene if the option has been enabled
+                    var fog = new THREE.Fog(new THREE.Color(0xA9A9A9), 0, 300.0);
+                    scene.fog = fog; }
                
-        // Initializes the axis
-        pca1Axis = d3.axisBottom(pca1Scale).ticks(0);
-        pca2Axis = d3.axisLeft(pca2Scale).ticks(0);
-        
-        // Appends the PCA1 axis
-        simSvg.append("g")
-            .attr("class","pca1_axis")
-            .attr("transform", "translate(0,"+200+")")
-            .call(pca1Axis);
-        simSvg.append("text")
-            .attr("class","label")
-            .attr("x", small_chart_dimensions.width-110)
-            .attr("y", 212)
-            .style("text-anchor","end")
-            .style("font", "12px times")
-            .text("PC1");
-        
-        // Appends the PCA2 axis
-        simSvg.append("g")
-            .attr("class","pca2_axis")
-            .call(pca2Axis);
-        simSvg.append("text")
-            .attr("class","label")
-            .attr("transform", "rotate(-90)")
-            .attr("y", 6)
-            .attr("dy","-1.2em")
-            .style("text-anchor","end")
-            .style("font", "12px times")
-            .text("PC2");
- 
-        // Plot the circles
-        circles = simSvg.selectAll("mycircle")
-            .data(relevantData)
-            .enter()
-            .append("circle")
-                .attr("class", function(d) {
-                    return d.driver;
-                })
-                .attr("cx", function(d) { 
-                    return pca1Scale(d.pca1); 
-                })
-                .attr("cy", function(d) { 
-                    return pca2Scale(d.pca2); 
-                })
-                .attr("r", function(d) {
-                    if (!notableDrivers.includes(d.driver)) {
-                        return 3;
-                    }
-                    return 6;
-                })
-                .style("fill", function(d) {
-                    if (!notableDrivers.includes(d.driver)) {  
-                        return "orange";
-                    }
-                    return colorsTeammates(d.driver);
-                })
-                .style("opacity", 0)
-                .style("stroke", "black");
+                difficulty = choosenDifficulty; // We apply the difficulty choosen 
+                carSpawner = requestAnimationFrame(spawnNewCar); // We spawn a new initial opponent car every few moments.
                 
-        circles
-            .transition()
-                .duration(animationsSpeed)
-                .style("opacity", 1);
-        
-        // Place the point of the selected driver again on the graph, so that it stands out
-        if (PCAmode == 0) {
-            simSvg
-                .append("circle")
-                    .attr("class", selectedDriver)
-                    .attr("cx", pca1Scale(pca1))
-                    .attr("cy", pca2Scale(pca2))
-                    .attr("r", 6)
-                    .style("fill", colorsTeammates(selectedDriver))
-                    .style("stroke", "black")
-                    .on("mouseover", function() {
-                        onMouseOverDriver(selectedDriver);
-                    })
-                    .on("mouseout", function() {
-                        onMouseOutDriver(selectedDriver);
-                    });   
-        } 
-        
-        // Interactions
-        circles.on("mouseover", function(d) {
-            onMouseOverDriver(d.driver);
-        });
-        
-        circles.on("mouseout", function(d) {
-            onMouseOutDriver(d.driver);
-        }); 
-        
-        // Draws the legend
-        plotPCALegend(data, data2, notableDrivers);
-    }
-    
-    // Draws the legend for the similar drivers chart
-    function plotPCALegend(data, data2, notableDrivers) {
-        // Erase previous data
-        svgSimLegend.selectAll('*').remove();
-        
-        svgSimLegend.append("text")
-            .style("font", "12px times")
-            .attr("y", 5)
-            .text("Click to filter data!");
-        
-         // Resize the legend if there too many entries
-        if (notableDrivers.length > 11) {
-            d3.select(".svgSim").attr("height", (notableDrivers.length*sizeSquare*1.5)+10);
-        }
-        else {
-            d3.select(".svgSim").attr("height", small_container_dimensions.height-30);
-        }
-        
-        // Prepares the space/layout for the legend
-        sizeSquare = 10;
-        legend = svgSimLegend.selectAll("legend")
-            .data(notableDrivers)
-            .enter()
-            .append("g")
-            .attr("class", "legend")
-			.attr("transform", function(d,i){
-                return "translate(0,"+((i+1)*sizeSquare+i*5)+")";
-            });
-        
-        // Draws the small colored rectangles
-        legend.append("rect")
-			.attr("width", sizeSquare)
-			.attr("height", sizeSquare)
-            .attr("class", function(d) {
-                return "rect"+d;
-            })
-			.style("fill", function(d){
-                if (d == "Other") {
-                    return "orange";
-                }
-                if (teammatesDisabled.includes(d) || driversDisabled.includes(d)) {
-                    return "grey";
-                }
-                return colorsTeammates(d);
-			});
-            
-        // Writes the text near the small colored rectangles
-        legend.append("text")
-            .attr("class", function(d) {
-                return "text"+d;
-            })
-            .attr("x", sizeSquare+5)
-            .attr("y", sizeSquare/2)
-            .attr("dy", ".35em")
-            .style("font", "12px times")
-            .style("fill", function(d) {
-                if (teammatesDisabled.includes(d) || driversDisabled.includes(d)) {
-                    return "grey";
-                }
-                return "black";
-            })    
-            .text(function(d) {
-                return d.replace(/_/g, ' ');
-            });
-        
-        // Add input events to the legend
-        legend
-            .on("mouseover", function(d) {
-                if (d == "Other") {
-                    return;
-                } 
-                document.body.style.cursor = "pointer";
-                onMouseOverDriver(d);
-            })
-            .on("mouseout", function(d) {
-                if (d == "Other") {
-                    return;
-                }
-                document.body.style.cursor = "default";
-                onMouseOutDriver(d);
-            })
-            .on("click", function(d) {
-                onClickDriver(d, data, data2);
-            });
-    }
-    
-    // Actions to take when the user hovers over a driver
-    function onMouseOverDriver(driver) {
-        // Highlights the entries in the legends
-        d3.selectAll(".rect" + driver)
-            .attr("stroke", "black");
-        d3.selectAll(".text" + driver)
-            .attr("text-decoration", "underline overline");
-        
-        // Highligths circle and updates stats
-        if (notableDrivers.includes(driver)) {
-            d3.select("." + driver).attr("r", 8);
-        }
-        else {
-            d3.select("." + driver).attr("r", 5);
-        }
-        var currentDriverAchievements = [];
-        for (i = 0; i < achievements.length; i++) {
-            if (achievements[i].driver == driver) {
-                currentDriverAchievements = achievements[i];
-            }
-        }
-        if (allDrivers.includes(driver)) {
-            labelAchievements.innerHTML = "<b> "+ driver.replace(/_/g, ' ') + "</b><br>";
-            labelAchievements.innerHTML += "Points: " + currentDriverAchievements.points + " - Starts: " + currentDriverAchievements.starts + " - Finishes: " + currentDriverAchievements.finishes + " - Podiums: " + currentDriverAchievements.podiums + "<br>";
-            labelAchievements.innerHTML += "Wins: " + currentDriverAchievements.wins + " - Poles: " + currentDriverAchievements.poles + " - Championships " + currentDriverAchievements.championships;
-        }
-        
-        // Highlights the right bars in the teammate chart
-        if (driver == selectedDriver) {
-            cmpSvg.selectAll("[class^=rect0]")
-                .style("stroke", "black");
-        }
-        else {
-            cmpSvg.selectAll("[class^=rect0][class$=" + driver + "]")
-                .style("stroke", "black");
-            cmpSvg.selectAll("[class^=rect1][class$=" + driver + "]")
-                .style("stroke", "black");
-        }
-    }
-    
-    // Actions to take when the user stops hovering over a driver
-    function onMouseOutDriver(driver) {      
-        // Restores the entries in the legend
-        d3.selectAll(".rect"+ driver)
-            .attr("stroke", "none");
-        d3.selectAll(".text" + driver)
-            .attr("text-decoration", "none");
-            
-        // Restores everything in the PCA chart
-        if (notableDrivers.includes(driver)) {
-            d3.select("." + driver).attr("r", 6);
-        }
-        else {
-            d3.select("." + driver).attr("r", 3);
-        }
-        labelAchievements.innerHTML = "<b>No Driver Highlighted</b><br>";
-        labelAchievements.innerHTML += "Points: ? - Starts: ? - Finishes: ? - Podiums: ? <br>";
-        labelAchievements.innerHTML += "Wins: ? - Poles: ? - Championships ?";
-            
-        // Restores everything in the teammate chart
-        cmpSvg.selectAll("[class^=rect]")
-            .style("stroke", "white");
-    }
-    
-    // Actions to take when the user clicks on a driver
-    function onClickDriver(driver, data, data2) {
-        if (driver == "Other") {
-            alert("Can't disable all points in the PCA!");
-            return;
-        }
-        // Deactivate teammate
-        else if (!teammatesDisabled.includes(driver) && teammates.includes(driver)) {
-            // Check it is possibile to filter out the driver
-            if (driver == selectedDriver) {
-                alert("Can't filter out the selected driver!");
-                return;
-            }
-            if (teammatesDisabled.length == teammates.length-2) {
-                alert("Can't filter out all teammates!");
-                return;
-            }
-       
-            teammatesDisabled.push(driver);
-                    
-            // Disables the entry in the constructor legend
-            d3.selectAll(".rect" + driver)
-                .style("fill", "grey");
-            d3.selectAll(".text" + driver)
-                .style("fill", "grey");
-        }
-        // Reactivate teamamte
-        else if (teammates.includes(driver)) {
-            var index = teammatesDisabled.indexOf(driver);
-            teammatesDisabled.splice(index, 1);
-            lastTeammateEnabled = driver;
-                    
-            // Restores the entry in the legend
-            d3.selectAll(".rect" + driver)
-                .style("fill", colorsTeammates(driver));
-            d3.selectAll(".text" + driver)
-                .style("fill", "black");
-        }
-        // Deactivate a driver that is not teammate
-        else if (!driversDisabled.includes(driver)) {
-            driversDisabled.push(driver);
-                    
-            // Disables the entry in the constructor legend
-            d3.selectAll(".rect" + driver)
-                .style("fill", "grey");
-            d3.selectAll(".text"+driver)
-                .style("fill", "grey");
-        }
-        // Reactivate a driver that is a teammate
-        else {
-            var index = driversDisabled.indexOf(driver);
-            driversDisabled.splice(index, 1);
-                    
-            // Restores the entry in the legend
-            d3.selectAll(".rect" + driver)
-                .style("fill", colorsTeammates(driver));
-            d3.selectAll(".text" + driver)
-                .style("fill", "black");
-        }
-        
-        // Redraws the data
-        if (teammates.includes(driver)) {
-            var lastConstructorsDisabledSize = constructorsDisabled.length;
-            plotComparisons(data, data2);
-            plotPCA(data, data2);
-            if (constructorsDisabled.length != lastConstructorsDisabledSize) {
-                plotPointsAchieved(data, data2);
-                maxValueDNF = 0;
-                minYearSelectedDNF = minYear;
-                maxYearSelectedDNF = maxYear;
-                minYearSelectedCons = minYear;
-                maxYearSelectedCons = maxYear;
-                drawDNFTimeSlider(data);
-                plotDNF(data, minYearSelectedDNF, maxYearSelectedDNF, selectedTrackDNF);
-                drawConsistencyTimeSlider(data);
-                plotConsistency(data, minYearSelectedCons, maxYearSelectedCons, selectedTrackCons);
-            }
-        }
-        else {
-            plotPCA(data, data2);
-        }
-    }
-      
-    // Adds the list of tracks to a selection
-    function addCircuitsToSelection(selection) {
-        // Reorder the circuits
-        circuits.sort(function(a, b) {
-            if (a < b) { 
-                return -1; 
-            }
-            if (a > b) { 
-                return 1; 
-            }
-            return 0;
-        });
-        
-        // Adds the reordered circuits to the selection
-        for (i = 0; i < circuits.length; i++) {
-            var newCircuitOption = document.createElement('option'); // Makes the new season a selectable option 
-            newCircuitOption.value = i+1;
-            newCircuitOption.innerHTML = circuits[i];
-            selection.appendChild(newCircuitOption);
-        }
-    }
-        
-    // Draws on the svg a label near the mouse location
-    function drawOnMouseOverLabel(coords, svg, text, color, place, minPlace, maxPlace) {
-        // Each text label will be inside a black outlined rect in g
-        g = svg.append("g") 
-            .attr("class", "rect_label");
-        rect = g.append('rect')
-            .attr("width", text.length*7)
-            .attr("height", 20)
-            .attr("stroke", "black")
-            .style("fill", "white"); 
-                            
-        // Checks if to place the information on the right or on the left of the mouse location
-        if (parseInt(place) <= (parseInt(minPlace)+ parseInt(maxPlace))/2) {
-            rect.attr("x", coords[0]+6)
-                .attr("y", coords[1]-30);
-            g.append('text')
-                .attr("x", coords[0]+10)
-                .attr("y", coords[1]-15)
-                .attr("fill", color)
-                .text(text);
-        }
-        else {
-            rect.attr("x", coords[0]-250)
-                .attr("y", coords[1]-30);
-            g.append('text')
-                .attr("x", coords[0]-246)
-                .attr("y", coords[1]-15)
-                .attr("fill", color)
-                .text(text);      
-        }
-    }                        
-    
-    // Writes the right text on the upper right section of the application
-    function writeOnAbout(index) {
-        // Change some attributes of the div
-        if (index >= 0 && index <= 2) {
-            about.style.paddingTop = "5px";
-            about.style.fontSize = "13px";
-            about.style.height = "71px";
-        }
-        else {
-            about.style.paddingTop = "2px";
-            about.style.fontSize = "12px";
-            about.style.height = "74px";
-        }
-        
-        if (index == 0) {
-            about.innerHTML = "<b>- ABOUT -</b><br>";
-            about.innerHTML += "This VA application allows the user to find stats on Formula 1 drivers since 1994, so that they can gain a better knowledge of their skill and place in the sport.<br>";
-            about.innerHTML += "<i>- Made by Luca Sannino as a project for Visual Analytics 2021 -</i>";
-        }
-        else if (index == 1) {
-            
-            about.innerHTML = "<b>- POINTS PER SEASON -</b><br>";
-            about.innerHTML += "This bar chart shows the points achieved by the selected driver per season.<br>"
-            about.innerHTML += "<b>Interactions</b>: Clicking on bars to calculate averages; Clicking on the legend to filter data about a constructor.";
-        }
-        else if (index == 2) {
-            about.innerHTML = "<b>- WINS/LOSSES AGAINST TEAMMATES -</b><br>";
-            about.innerHTML += "This bar chart shows how many times the selected driver has placed better than their teammates across the seasons, both in races and qualifying.<br>";
-            about.innerHTML += "<b>Interactions</b>: Clicking on the legend to filter data about a teammate.";
-        }
-        else if (index == 3) {
-            about.innerHTML = "<b>- DNFs' CAUSES -</b><br>";
-            about.innerHTML += "This lollipop chart shows the causes of DNFs. '<b>Damage</b>' includes cases of external damage to the car (tyre punctures, broken wings etc.), while '<b>Reliability</b>' includes issues to the internal components (power loss, engine on fire etc.).<br>"; 
-            about.innerHTML += "<b>Interactions</b>: Using the time slider and selecting circuits to focus on a part of the data."
-        }
-        else if (index == 4) {
-            about.innerHTML = "<b>- PLACEMENTS' CONSISTENCY ON FINISHES -</b><br>";
-            about.innerHTML += "This box-plot chart shows the distribution of the placements upon finishes. A quartile of the distribution falls in each of the four sections, meaning that the gray box represents ~50% of the placements.<br>";
-            about.innerHTML += "<b>Interactions</b>: Using the time slider and selecting circuits to focus on a part of the data."
-        }
-        else if (index == 5) {
-            about.innerHTML = "<b>- PLACE IN THE SPORT'S HISTORY -</b><br>";
-            about.innerHTML += "This scatter plot chart shows the placement of the selected driver in terms of career achievements, alongside other drivers since 1994. The closeness of the points was calculated using PCA on multidimensional data.<br>";
-            about.innerHTML += "<b>Interactions</b>: Clicking on the legend to filter data about a driver."
-        }
-    }
-          
-    // Finds the points achieved by a driver season by season
-    function findPointsAchieved(data) {
-        // Groups all the results by pilot
-        groupedResults = d3.nest()
-            .key(function(d) {
-                return d.surname + "_" + d.name;
-            })
-            .entries(data);
+                hud = document.createElement('div'); // We create the HUD
+                hud.id = "hud";
+                hud.innerHTML = "Passes: " + passes;
+                hud.innerHTML += "<br>Speed: " + difficulty.toFixed(1);
+                hud.style.visibility = "hidden";
+                document.body.appendChild(hud);
+                wheelScreenText();
 
-        // Finds the results of the selected pilot
-        relevantResults = [];
-        for (i = 0; i < groupedResults.length; i++) {
-            driverResults = groupedResults[i];
-            if (driverResults.key == selectedDriver) {
-                relevantResults = driverResults.values;
-            }
-        }
-        
-        filteredResults = [];
-        for (i = 0; i < relevantResults.length; i++) {
-            if (!constructorsDisabled.includes(relevantResults[i].constructor)) {
-                filteredResults.push(relevantResults[i]);
-            }
-        }
-        
-        // Groups the relevant results by year/constructor and finds the total number of points by year/constructor
-        if (showTotalPoints) {
-            relevantResults = d3.nest()
-                .key(function(d) {
-                    return d.year;
-                })
-                .key(function(d) {
-                    return d.constructor.replace(/\s/g, '_');
-                })
-                .rollup(function(d) {
-                    return {
-                        totalPoints: d3.sum(d, function(g) {
-                            return g.points;
-                        })
-                    }
-                })
-                .entries(filteredResults);
-        }
-        // Groups the relevant results by year/constructor and finds the average number of points per race by year/constructor
-        else {
-            relevantResults = d3.nest()
-                .key(function(d) {
-                    return d.year;
-                })
-                .key(function(d) {
-                    return d.constructor.replace(/\s/g, '_');
-                })
-                .rollup(function(d) {
-                    return {
-                        totalPoints: d3.mean(d, function(g) {
-                            return g.points;
-                        })
-                    }
-                })
-                .entries(filteredResults);
-        }
-        
-        /* DEBUG
-        console.log(relevantResults); */
-        
-        return relevantResults;
-    }
-     
-    // Finds how many times the current driver has won against his teammates
-    function findWinsAgainstTeammates(data) {
-        // Groups all the results by race and constructor
-        groupedResults = d3.nest()
-            .key(function(d) {
-                return d.year + "_" + d.round + "_" + d.grandprix + "_" + d.constructor;
-            })
-            .entries(data);
-
-        // Extracts the results of the selected driver and his teammate (or even teammates) for each race
-        relevantResults = [];
-        newTuples = [];
-        for (i = 0; i < groupedResults.length; i++) {
-            constructorResults = groupedResults[i].values;
-            selectedDriverPosition = 0;
-            name = "";
-            surname = "";
-            findTeammates = false;
-            for (j = 0; j < constructorResults.length; j++) {
-                if ((constructorResults[j].surname + "_" + constructorResults[j].name) == selectedDriver && findTeammates == false) {
-                    relevantResults.push(constructorResults);
-                    findTeammates = true;
-                    selectedDriverPosition = constructorResults[j].position;
-                    name = constructorResults[j].name;
-                    surname = constructorResults[j].surname;
-                    j = -1;
-                }
-                else if ((constructorResults[j].surname + "_" + constructorResults[j].name) != selectedDriver && findTeammates == true) {
-                    // Restore a constructor if the user has filtered in a driver which drove for a previously filtered out constructor
-                    if (lastTeammateEnabled == (constructorResults[j].surname + "_" + constructorResults[j].name)) {
-                        lastTeammateEnabled = "";
-                        if (constructorsDisabled.includes(constructorResults[j].constructor)) {
-                            var index = constructorsDisabled.indexOf(constructorResults[j].constructor);
-                            constructorsDisabled.splice(index, 1);
-                        }
-                    }
+                setControls();       
+                animateGameplay(); }
+            
+            // Animates the player's car. Auxiliary function of animateGameplay()
+            function animateGameplayPlayer() {
+                var rotazione = models.getObjectByName("Left Anterior Tyre").rotation; // Gets the current rotation values of the anterior tyres
+                if (leftOrRight == 1 && models.getObjectByName("Gameplay Road").position.z > -7.0) { // The player wants to turn left and there's still place on the road
+                    models.getObjectByName("Gameplay Road").translateY(0.2); // Moves the road to right. The player is ALWAYS still.
+                    // pointLight.translateY(0.1); // Slightly moves the light as well
+                    if (models.getObjectByName("Wheel").rotation.z <= maxSteering) { // Moves the wheel if it hasn't already reached the max steering
+                        models.getObjectByName("Wheel").rotateZ(steering); // Turns the wheel to left
+                        models.getObjectByName("Body").rotateY(carTurning); // Turns the body of the car to left
+                        models.getObjectByName("Head Cockpit").rotateY(headTurning); // Turns the pilot's head to left
+                        models.getObjectByName("Left Anterior Tyre").rotation.set(rotazione.x, 0, 0);  // We apply the x value of the current rotation value (else the animation fails) to the anterior left tyre
+                        models.getObjectByName("Left Anterior Tyre").rotateX(-tyreTurning); // Turns the left anterior tyre to the left
+                        models.getObjectByName("Right Anterior Tyre").rotation.set(rotazione.x, 0, 0); // The same for the right anterior tyre
+                        models.getObjectByName("Right Anterior Tyre").rotateX(-tyreTurning); } }
+                else if (leftOrRight == 2 && models.getObjectByName("Gameplay Road").position.z < 7.0) { // The player wants to turn right and there's still place on the road
+                        models.getObjectByName("Gameplay Road").translateY(-0.2);
+                        // pointLight.translateY(-0.1);
+                        if (models.getObjectByName("Wheel").rotation.z >= -maxSteering) {
+                            models.getObjectByName("Wheel").rotateZ(-steering);
+                            models.getObjectByName("Body").rotateY(-carTurning);
+                            models.getObjectByName("Head Cockpit").rotateY(-headTurning);
+                            models.getObjectByName("Left Anterior Tyre").rotation.set(rotazione.x, 0, 0); 
+                            models.getObjectByName("Left Anterior Tyre").rotateX(tyreTurning);   
+                            models.getObjectByName("Right Anterior Tyre").rotation.set(rotazione.x, 0, 0); 
+                            models.getObjectByName("Right Anterior Tyre").rotateX(tyreTurning); } }
+                else if (leftOrRight == 0) { // The player stopped moving. The car returns to neutral position
+                    if (models.getObjectByName("Wheel").rotation.z > 0.1) { // The player was moving to the left
+                        models.getObjectByName("Wheel").rotateZ(-steering);
+                        models.getObjectByName("Body").rotateY(-carTurning);
+                        models.getObjectByName("Head Cockpit").rotateY(-headTurning);
+                        models.getObjectByName("Left Anterior Tyre").rotation.set(rotazione.x, 0, 0); 
+                        models.getObjectByName("Left Anterior Tyre").rotateX(tyreTurning);
+                        models.getObjectByName("Right Anterior Tyre").rotation.set(rotazione.x, 0, 0); 
+                        models.getObjectByName("Right Anterior Tyre").rotateX(tyreTurning); }
+                    else if (models.getObjectByName("Wheel").rotation.z < -0.1) { // The player was moving to the right
+                        models.getObjectByName("Wheel").rotateZ(steering);
+                        models.getObjectByName("Body").rotateY(carTurning);
+                        models.getObjectByName("Head Cockpit").rotateY(headTurning);
+                        models.getObjectByName("Left Anterior Tyre").rotation.set(rotazione.x, 0, 0); 
+                        models.getObjectByName("Left Anterior Tyre").rotateX(-tyreTurning);
+                        models.getObjectByName("Right Anterior Tyre").rotation.set(rotazione.x, 0, 0); 
+                        models.getObjectByName("Right Anterior Tyre").rotateX(-tyreTurning); } }
+                
+                models.getObjectByName("Left Posterior Tyre").rotateZ(tyreSpeed); // Rotates the tyres on the z axis
+                models.getObjectByName("Right Posterior Tyre").rotateZ(-tyreSpeed);
+                models.getObjectByName("Left Anterior Tyre").rotateZ(tyreSpeed);
+                models.getObjectByName("Right Anterior Tyre").rotateZ(-tyreSpeed); }
+            
+            // Animates the obstacles on the road. Auxiliary function of animateGameplay()
+            function animateGameplayRoad() {
+                try {
+                    models.getObjectByName("Gameplay Road").traverse(function (child) { // Children on the road navigate from negative x to positive x   
+                        // Collision check
+                        if (child.name == "Opponent Body" && child.position.x > -0.02) { // We enable collision boxes only when an opponent car is close to the player
+                            collisionBoxOpponent = new THREE.Box3().setFromObject(child.getObjectByName("Collision Box Visible")); // Creation of collision boxes from boxHelpers
+                            collisionBoxPlayer = new THREE.Box3().setFromObject(collisionBoxPlayerVisible);
+                            if (collisionBoxOpponent.intersectsBox(collisionBoxPlayer)) { // Check intersection for collisions
+                                if (models.getObjectByName("Wheel").rotation.z > 0) { // The car spins to the left
+                                    crashType = 0; }
+                                else if (models.getObjectByName("Wheel").rotation.z < 0) { // The car spins to the right
+                                    crashType = 1; }
+                                else { // The car spins in a random direction
+                                    crashType = Math.floor(Math.random() * 2); }
+                                crash = true; } }
                     
-                    // The data is not of interest because the constructor is filtered out
-                    if (constructorsDisabled.includes(constructorResults[j].constructor)) {
-                        continue;
-                    }
+                        // Pass check
+                        if (child.position.x > 0.01 && child.name == "Opponent Body") { // Check if the opponent is behind you
+                            models.getObjectByName("Gameplay Road").remove(child); // Deletes the child from the road: saves resources! (IT ALSO CAUSES AN EXCEPTION FOR WHATEVER REASON)
+                            passes += 1;
+                            if (passes % 50 == 0) { // Check if there are enough passes to increase the speed
+                                difficulty += 0.1; }      
+                            wheelScreenText(); // Refresh the screen on the wheel
+                            document.getElementById("hud").innerHTML = "Passes: " + passes; // Refresh the hud
+                            document.getElementById("hud").innerHTML += "<br>Speed: " + difficulty.toFixed(1); }
                     
-                    // The data is not of interest because the driver is filtered out
-                    if (teammatesDisabled.includes(constructorResults[j].surname + "_" + constructorResults[j].name) && lastConstructorEnabled != constructorResults[j].constructor) {
-                        continue;
-                    }
-                        
-                    newTuple = {
-                        year: constructorResults[j].year,
-                        round: constructorResults[j].round,
-                        grandprix: constructorResults[j].grandprix,
-                        constructor: constructorResults[j].constructor,
-                        selectedDriverSurname: surname,
-                        selectedDriverName: name,
-                        selectedDriverPosition: selectedDriverPosition,
-                        teammateSurname: constructorResults[j].surname,
-                        teammateName: constructorResults[j].name,
-                        teammatePosition: constructorResults[j].position
-                        }
-                    newTuples.push(newTuple);
-                }
-            }
-        }
-        lastConstructorEnabled = "";
-        
-        // Transforms the data in the final form used by the chart
-        relevantData = d3.nest()
-            .key(function(d) {
-                return d.year + "_" + d.teammateSurname + "_" + d.teammateName;
-            })
-            .rollup(function(d) {
-                return {
-                    selectedDriverWins: d3.sum(d, function(g) {
-                        if (g.selectedDriverPosition == "\\N" && g.teammatePosition != "\\N") {
-                            return 0;
-                        }
-                        if (g.selectedDriverPosition != "\\N" && g.teammatePosition == "\\N") {
-                            return 1;
-                        }
-                        if (g.selectedDriverPosition == "\\N" && g.teammatePosition == "\\N") {
-                            return 0;
-                        }
-                        if (parseInt(g.selectedDriverPosition) < parseInt(g.teammatePosition)) {
-                            return 1;
-                        }
-                        return 0;
-                    }),
-                    teammateWins: d3.sum(d, function(g) {
-                        if (g.selectedDriverPosition == "\\N" && g.teammatePosition != "\\N") {
-                            return 1;
-                        }
-                        if (g.selectedDriverPosition != "\\N" && g.teammatePosition == "\\N") {
-                            return 0;
-                        }
-                        if (g.selectedDriverPosition == "\\N" && g.teammatePosition == "\\N") {
-                            return 0;
-                        }
-                        if (parseInt(g.teammatePosition) < parseInt(g.selectedDriverPosition)) {
-                            return 1;
-                        }
-                        return 0;
-                    }),
-                    constructor: ""
-               }
-            })
-            .entries(newTuples);   
-        
-        // Adds the constructors to the data
-        relevantData.forEach(function(d) {
-            var year = d.key.substring(0, 4); 
-            var teammate = d.key.substring(5, d.key.length);
-            newTuples.forEach(function(f) {
-                if (f.year == year && ((f.teammateSurname + "_" + f.teammateName) == teammate)) {
-                    d.value.constructor = f.constructor;
-                }
-            });
-        });
-        
-        /* DEBUG
-        console.log(relevantData); */
-        
-        return relevantData;
-    }
-    
-    // Finds the reasons of DNFs for the selected driver
-    function findDNFs(data, minYear, maxYear, index) {  
-        // Groups all the results by driver
-        groupedResults = d3.nest()
-            .key(function(d) {
-                return d.surname + "_" + d.name;
-            })
-            .entries(data);
-        
-        // Finds the all the finish states of the selected pilot in the form of new tuples
-        newTuples = [];
-        for (i = 0; i < groupedResults.length; i++) {
-            driverKey = groupedResults[i].key;
-            if (driverKey == selectedDriver) {
-                driverResults = groupedResults[i].values;
-                for (j = 0; j < driverResults.length; j++) {
-                    // Check if the current race was set in a circuit selected by the user
-                    if (index != 0 && circuits[index-1] != driverResults[j].circuit) {
-                       continue;
-                    }
-                    // Check if the driver was driving for a filtered out constructor
-                    if (constructorsDisabled.includes(driverResults[j].constructor)) {
-                        continue;
-                    }
-                    // Everything's ok!
-                    tuple = {
-                            year: driverResults[j].year,
-                            round: driverResults[j].round,
-                            grandprix: driverResults[j].grandprix,
-                            constructor: driverResults[j].constructor,
-                            status: driverResults[j].status
-                            }
-                    newTuples.push(tuple);
-                }
-            }
-        }
-        
-        // Transforms the data in the final form used by the chart
-        physicalDamage = ["Accident", "Collision", "Collision Damage", "Spun off", 
-                          "Puncture", "Suspension", "Tyre", "Front wing", 
-                          "Broken wing", "Tyre puncture", "Rear wing", "Physical", 
-                          "Damage", "Injured", "Injury", "Driver unwell", "Fatal accident"];
-        retiredReasons = ["Retired", "Disqualified", "Did not qualify", "Safety", 
-                          "Not classified", "Not restarted", "Safety concerns", "Excluded"];
-        relevantData = d3.nest()
-            .key(function(d) {
-                return d.year;
-            })
-            .rollup(function(d) {
-                return {
-                    count: d3.sum(d, function(g) {
-                        return 1;
-                    }),
-                    finished: d3.sum(d, function(g) {
-                        if (g.status == "Finished" || g.status.substring(0, 1) == "+") {
-                            return 1;
-                        }
-                        return 0;
-                    }),
-                    retired: d3.sum(d, function(g) {
-                        if (retiredReasons.includes(g.status)) {
-                            return 1;
-                        }
-                        return 0;
-                    }),
-                    physical: d3.sum(d, function(g) {
-                        if (physicalDamage.includes(g.status)) {
-                            return 1;
-                        }
-                        return 0;
-                    }),
-                    mechanical: d3.sum(d, function(g) {
-                        if (g.status.substring(0, 1) != "+" && g.status != "Finished" && !retiredReasons.includes(g.status) && !physicalDamage.includes(g.status)) {
-                            return 1;
-                        }
-                        return 0;
-                    })
-               }
-            })
-            .entries(newTuples);  
-        
-        // Sum the results of the selected years before returning the results
-        countTotal = 0;
-        finishedTotal = 0;
-        retiredTotal = 0;
-        physicalTotal = 0;
-        mechanicalTotal = 0;
-        woundsTotal = 0;
-        for (i = 0; i < relevantData.length; i++) {
-            year = relevantData[i].key;
-            if (year >= minYear && year <= maxYear) {
-                values = relevantData[i].value;
-                countTotal += values.count;
-                finishedTotal += values.finished;
-                retiredTotal += values.retired;
-                physicalTotal += values.physical;
-                mechanicalTotal += values.mechanical;
-                woundsTotal += values.wounds;
-            }
-        }
-        
-        // Makes the final results
-        relevantResults = [];
-        tuple = {key: "count", value: countTotal};
-        relevantResults.push(tuple);
-        tuple = {key: "finished", value: finishedTotal};
-        relevantResults.push(tuple);
-        tuple = {key: "Retirement", value: retiredTotal};
-        relevantResults.push(tuple);
-        tuple = {key: "Damage", value: physicalTotal};
-        relevantResults.push(tuple);
-        tuple = {key: "Reliability", value: mechanicalTotal};
-        relevantResults.push(tuple);
-        
-        /* DEBUG
-        console.log(relevantResults); */
-        
-        return relevantResults;
-    }
-    
-    // Finds the placements of the selected driver
-    function findPlacements(data, minYear, maxYear, index) {
-        // Groups all the results by pilot
-        var groupedResults = d3.nest()
-            .key(function(d) {
-                return d.surname + "_" + d.name;
-            })
-            .entries(data);
-        
-        // Finds the results of the selected pilot between the chosen range of years, and keeps track of the circuits
-        var relevantResults = [];
-        var starts = 0;
-        var wins = 0;
-        var podiums = 0;
-        for (i = 0; i < groupedResults.length; i++) {
-            var key = groupedResults[i].key;
-            if (key == selectedDriver) {
-                var values = groupedResults[i].values;
-                for (j = 0; j < values.length; j++) {
-                    if (!circuits.includes(values[j].circuit)) {
-                        circuits.push(values[j].circuit);
-                    }
+                        // Underpass spawn check
+                        if (child.position.x > spawnPoint/2 && (child.name == "Right Underpass" || child.name == "Left Underpass" || child.name == "Upper Underpass")) {
+                            child.position.set(-spawnPoint, child.position.y, child.position.z); } // Spawn a new underpass
                     
-                    // Check if the current race was set in a circuit selected by the user
-                    if (index != 0 && circuits[index-1] != values[j].circuit) {
-                        continue;
-                    }
-                    
-                    // Check if the driver was driving for a filtered out constructor
-                    if (constructorsDisabled.includes(values[j].constructor)) {
-                        continue;
-                    }
-                    
-                    // Check if driver was driving in the selected time frame
-                    if (values[j].year >= minYear && values[j].year <= maxYear) {
-                        starts += 1;
-                        
-                        // Check if the driver reached the finish line
-                        if (values[j].status == "Finished" || values[j].status.substring(0, 1) == "+") {
-    
-                            // Refresh wins/podiums counter
-                            if (parseInt(values[j].position) >= 1 && parseInt(values[j].position) <= 3) {
-                                podiums += 1;
-                                if (parseInt(values[j].position) == 1) {
-                                    wins += 1;
-                                }
-                            }
-                            relevantResults.push(parseInt(values[j].position));
-                        }
-                    }
-                }
-            }
-        }
-        
-        // Create a tuple with the stats
-        var newTuple = {
-            starts: starts,
-            wins: wins,
-            podiums: podiums
-        }
-        relevantResults.push(newTuple);
-        
-        /* DEBUG
-        console.log(relevantResults); */
-        
-        return relevantResults;   
-    }
-          
-    drawTitle();
-    </script>
+                        // Movement of the objects on the road
+                        if (child.name == "Upper Underpass") {
+                            child.translateX(speed*difficulty); }
+                        else if (child.name == "Left Underpass" || child.name == "Right Underpass") {            
+                            child.translateX(-speed*difficulty); }
+                        else if (child.name == "Opponent Body" && crash == false) {
+                            child.translateX((speed/1.5)*difficulty); } } ); }
+         
+            catch(e) { // We catch the exception caused by eliminating a passed car
+                // We do nothing
+            } }
+            
+            // Animates the gameplay scene
+            function animateGameplay() {    
+                animateGameplayPlayer();
+                animateGameplayRoad();
+                if (crash == false) {
+                    gameplayAnimation = requestAnimationFrame(animateGameplay);
+                    renderer.render(scene, camera); }
+                else {
+                    clearInterval(carSpawner);
+                    gameOver(); } }
+            
+            // Animation of the player's crash. Auxiliary function of gameOver()
+            function crashAnimation() {
+                // Car spin animation
+                if (crashType == 0 && crash == true) { // The car spins to the left
+                    if (models.getObjectByName("Body").rotation.y > -0.7) { // The car spins after crashing
+                        models.getObjectByName("Body").rotateY(0.12);
+                        camera.translateZ(0.02); }
+                    else { // The animation is over
+                        gameOverScreen.style.visibility = "visible"; } }
+                else if (crashType == 1 && crash == true) { // The car spins to the right
+                    if (models.getObjectByName("Body").rotation.y < 0.7) { 
+                        models.getObjectByName("Body").rotateY(-0.12);
+                        camera.translateZ(0.02); }
+                    else {
+                        gameOverScreen.style.visibility = "visible"; } }
+                
+                // Wheel animation
+                var rotazione = models.getObjectByName("Damaged Right Anterior Tyre").rotation; 
+                models.getObjectByName("Damaged Right Anterior Tyre").rotation.set(rotazione.x, 0, rotazione.z);
+                if (leftOrRight == 1 && models.getObjectByName("Wheel").rotation.z <= maxSteering) { // The player is still able to turn the wheel
+                    models.getObjectByName("Wheel").rotateZ(steering);
+                    models.getObjectByName("Damaged Right Anterior Tyre").rotateX(-tyreTurning/2); }
+                else if (leftOrRight == 2 && models.getObjectByName("Wheel").rotation.z >= -maxSteering) {
+                    models.getObjectByName("Wheel").rotateZ(-steering);
+                    models.getObjectByName("Damaged Right Anterior Tyre").rotateX(tyreTurning/2); }
+                else if (leftOrRight == 0 && models.getObjectByName("Wheel").rotation.z > 0.1) {
+                    models.getObjectByName("Wheel").rotateZ(-steering); 
+                    models.getObjectByName("Damaged Right Anterior Tyre").rotateX(tyreTurning/2); }
+                else if (leftOrRight == 0 && models.getObjectByName("Wheel").rotation.z < -0.1) {
+                    models.getObjectByName("Wheel").rotateZ(steering);
+                    models.getObjectByName("Damaged Right Anterior Tyre").rotateX(-tyreTurning/2); }
+                
+                // Damaged tyre animation
+                if (damagedTyreDirection == false && models.getObjectByName("Damaged Right Anterior Tyre").rotation.z > -0.4) { // The damaged tyre keeps switching rotation direction
+                    models.getObjectByName("Damaged Right Anterior Tyre").rotateZ(-tyreSpeed/10); }
+                else {
+                    damagedTyreDirection = true; }
+                if (damagedTyreDirection == true && models.getObjectByName("Damaged Right Anterior Tyre").rotation.z < -0.1) {
+                    models.getObjectByName("Damaged Right Anterior Tyre").rotateZ(tyreSpeed/10); }
+                 else {
+                    damagedTyreDirection = false; }
+                
+                if (crash == true) { // Continues to render the game over screen until the player returns to the main menu
+                 requestAnimationFrame(crashAnimation); }
+                renderer.render(scene, camera); }     
+            
+            // The player has hit an opponent's car
+            function gameOver() {
+                document.title = "Formula Driver - Game Over"
+                document.body.removeChild(hud); // We remove the HUD
+                gameOverScreen = document.createElement('div'); // We create the game over screen
+                gameOverScreen.id = "gameover";
+                gameOverScreen.innerHTML = "GAME OVER!";
+                gameOverScreen.innerHTML += "<br>Passes: " + passes;
+                gameOverScreen.innerHTML += "<br>Speed: " + difficulty.toFixed(1) + "<br>";
+                document.body.appendChild(gameOverScreen); 
+                var continueButton = document.createElement('button');
+                continueButton.id = "Menu";
+                continueButton.innerHTML = "Back To Menu";
+                gameOverScreen.appendChild(continueButton);
+                gameOverScreen.style.visibility = "hidden";
+                
+                models.getObjectByName("Front").visible = false; // We hide the front of the car...
+                models.getObjectByName("Damaged Front").visible = true; //... to show instead its damaged version!
+                
+                camera = new THREE.PerspectiveCamera(30, 1, 0.1, 2000); // We update the camera
+                models.getObjectByName("Front Cockipt").add(camera); // We add the camera to the cockpit so that it can rotate in synch with the car
+                camera.position.set(0.0, 1.4, 2.8);
+                camera.rotation.set(-0.2, 0, 0);
+                // camera.scale = new THREE.Vector3(0.42, 1.0, 1.02);
+                
+                document.getElementById("Menu").onclick = function() { // The player returns to the menu. We reset all important values and restart the game
+                    crash = false;
+                    document.body.removeChild(gameOverScreen);
+                    document.body.removeChild(renderer.domElement);
+                    difficulty = 1.0;
+                    passes = 0;
+                    timer = 0;
+                    damagedTyreDirection = false;
+                    cockpit = true;
+                    menu = true;
+                    init(); };
+                
+                wheelScreenText();
+                crashAnimation(); }
+                      
+            // Updates the text on the screen of the wheel. 
+            function wheelScreenText() {
+                var canvas = document.createElement('canvas'); // Creates a canvas where to write the text on the wheel
+                var text = canvas.getContext('2d'); // It returns a CanvasRenderingContext2D: a 2D visualization of what's inside the canvas
+                canvas.width = 400; // Size of the canvas
+                canvas.height = 150;
+                text.font = '50px Helvetica';
+                text.fillStyle = 'white'; // Color of the text
+                if (menu == true) { // Message to print when the player is at the menu screen
+                    text.fillText('READY TO', 70, 55);
+                    text.fillText('   START', 70, 120); }
+                else if (crash == false) { // Message to print during regular gameplay
+                    text.fillText('Passes: ' + passes, 70, 55); // Second and third parameter are x, y coordinates of text
+                    text.fillText('Speed: ' + difficulty.toFixed(1), 70, 120); }
+                else { // Message to print when the player has crashed
+                    text.fillText('TERMINAL', 70, 55);
+                    text.fillText(' DAMAGE', 70, 120); }
+                var textureScreen = new THREE.Texture(canvas); // Obtains the canvas as a texture
+                textureScreen.wrapS = THREE.RepeatWrapping;
+                textureScreen.wrapT = THREE.RepeatWrapping;
+                textureScreen.anisotropy = renderer.capabilities.getMaxAnisotropy();
+                textureScreen.needsUpdate = true; // Without this, it doesn't work
+                models.getObjectByName("Screen Text").material.map = textureScreen; }
+            
+            // Set the resolution of the renderer according to the option choosen
+            function setResolutionRenderer() {
+                if (lowResolution == false) { // The renderer has the same size of the browser
+                    renderer.setSize(window.innerWidth, window.innerHeight); } 
+                else { // The renderer has the same size of the browser but half of its internal resolution
+                    renderer.setSize(window.innerWidth/2, window.innerHeight/2); // The renderer is half of its original size
+                    renderer.domElement.style.width = renderer.domElement.width * 2 + 'px'; // And then we double the canvas, while the renderer keeps its size
+                    renderer.domElement.style.height = renderer.domElement.height * 2 + 'px'; } }
+            
+            // Colors the car with according to the team choosen
+            function setTeamColors() {
+                if (team == 0) { // Ferrari
+                    models.getObjectByName("Front").material.color = new THREE.Color(0xff0000); // We change the colors on the car
+                    models.getObjectByName("Front").material.emissive = new THREE.Color(0, 0, 0); // All parts of the car share the same material, so changing the front, changes everything
+                    textureLogoTeam = new THREE.TextureLoader().load("textures/Ferrari.png"); // We load the correct logo
+                    textureLogoTeam.wrapS = THREE.RepeatWrapping;
+                    textureLogoTeam.wrapT = THREE.RepeatWrapping;
+                    textureLogoTeam.anisotropy = renderer.capabilities.getMaxAnisotropy();
+                    models.getObjectByName("Front Logo").material.map = textureLogoTeam; }
+                else if (team == 1) { // Mercedes   
+                    models.getObjectByName("Front").material.color = new THREE.Color(0x999999); 
+                    models.getObjectByName("Front").material.emissive = new THREE.Color(0, 0, 0); 
+                    textureLogoTeam = new THREE.TextureLoader().load("textures/Mercedes.png");
+                    textureLogoTeam.wrapS = THREE.RepeatWrapping;
+                    textureLogoTeam.wrapT = THREE.RepeatWrapping;
+                    textureLogoTeam.anisotropy = renderer.capabilities.getMaxAnisotropy();
+                    models.getObjectByName("Front Logo").material.map = textureLogoTeam; }
+                else { // RedBull
+                    models.getObjectByName("Front").material.color = new THREE.Color(0x000080);
+                    models.getObjectByName("Front").material.emissive = new THREE.Color(0, 0, 0); 
+                    textureLogoTeam = new THREE.TextureLoader().load("textures/Redbull.png");
+                    textureLogoTeam.wrapS = THREE.RepeatWrapping;
+                    textureLogoTeam.wrapT = THREE.RepeatWrapping;
+                    textureLogoTeam.anisotropy = renderer.capabilities.getMaxAnisotropy();
+                    models.getObjectByName("Front Logo").material.map = textureLogoTeam; } }
+            
+            // Enable or disable shadows according to the option choosen
+            function setShadows() {
+                if (shadows == true) {
+                    pointLight.castShadow = true; // The light can cast shadows
+                    pointLight.shadow.mapSize.width = 512; // Size of the shadows: the bigger number, the higher quality, but worse performance
+                    pointLight.shadow.mapSize.height = 512; 
+                    models.getObjectByName("Body").traverse(function (child) { // We enable every object on the scene to receive and cast shadow
+                        child.receiveShadow = true;
+                        child.castShadow = true; } );
+                    models.getObjectByName("Human").traverse(function (child) { 
+                        child.receiveShadow = true;
+                        child.castShadow = true; } );
+                    models.getObjectByName("Upper Underpass").castShadow = true;
+                    models.getObjectByName("Front Logo").castShadow = false; // The plane containing the logo can't cast shadow
+                    models.getObjectByName("Pit Road").receiveShadow = true;
+                    models.getObjectByName("Gameplay Road").receiveShadow = true;
+                    models.getObjectByName("Opponent Body").castShadow = true; 
+                    models.getObjectByName("Opponent Back").castShadow = true; 
+                    models.getObjectByName("Opponent Front").castShadow = true; }
+                else {
+                    pointLight.castShadow = false;
+                    models.getObjectByName("Body").traverse(function (child) { 
+                        child.receiveShadow = false;
+                        child.castShadow = false; } );
+                    models.getObjectByName("Human").traverse(function (child) { 
+                        child.receiveShadoe = false;
+                        child.castShadow = false; } );
+                    models.getObjectByName("Upper Underpass").castShadow = false;
+                    models.getObjectByName("Pit Road").receiveShadow = false;
+                    models.getObjectByName("Gameplay Road").receiveShadow = false;
+                    models.getObjectByName("Opponent Body").castShadow = false; 
+                    models.getObjectByName("Opponent Back").castShadow = false; 
+                    models.getObjectByName("Opponent Front").castShadow = false;} }
+                          
+            // Creates and animates the menu
+            function init() { 
+                createMenu();
+                animateMenu(); }
+            
+            // Starts the game
+            init();
+        </script>
     </body>
 </html>
