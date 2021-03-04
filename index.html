@@ -905,6 +905,10 @@
                     .attr("stroke", "black");
                 d3.select(".text"+d)
                     .attr("text-decoration", "underline overline");
+                if (constructorsDisabled.includes(d)) {
+                    document.getElementById(d).style.textDecoration = "underline overline";
+                    document.getElementById("cons"+d).style.textDecoration = "underline overline";
+                }
                 
                 // Highlights the bars
                 if (nBarsClicked == 0) {
@@ -933,6 +937,11 @@
                     .attr("stroke", "none");
                 d3.select(".text"+d)
                     .attr("text-decoration", "none");
+                if (constructorsDisabled.includes(d)) {
+                    document.getElementById(d).style.textDecoration = "none";
+                    document.getElementById("cons"+d).style.textDecoration = "none";
+                }
+                 
                 if (nBarsClicked == 0) {
                     barSvg.selectAll("[class*=" + d + "]")
                         .style("stroke", "none"); 
@@ -1577,6 +1586,7 @@
                 label.id = constructorsDisabled[i];
                 labelTotalRacesDNF.appendChild(label);
                 document.getElementById(label.id).onmouseover = function() {
+                    document.body.style.cursor = "pointer";
                     this.style.textDecoration = "underline overline";
                     document.getElementById("cons" + this.id).style.textDecoration = "underline overline";
                     d3.selectAll(".rect" + this.id)
@@ -1585,6 +1595,7 @@
                         .attr("text-decoration", "underline overline");  
                 }
                 document.getElementById(label.id).onmouseout = function() {
+                    document.body.style.cursor = "default";
                     this.style.textDecoration = "none";
                     document.getElementById("cons" + this.id).style.textDecoration = "none";
                     d3.selectAll(".rect" + this.id)
@@ -1593,6 +1604,7 @@
                         .attr("text-decoration", "none");  
                 }
                 document.getElementById(label.id).onclick = function() {
+                    document.body.style.cursor = "default";
                     onClickConstructor(this.id, data, data2);
                 }          
             }
@@ -1890,6 +1902,7 @@
                 label.id = "cons" + constructorsDisabled[i];
                 labelTotalRacesCons.appendChild(label);
                 document.getElementById(label.id).onmouseover = function() {
+                    document.body.style.cursor = "pointer";
                     var thisID = this.id.substring(4, this.id.length)
                     document.getElementById(thisID).style.textDecoration = "underline overline";
                     this.style.textDecoration = "underline overline";
@@ -1899,6 +1912,7 @@
                         .attr("text-decoration", "underline overline");     
                 }
                 document.getElementById(label.id).onmouseout = function() {
+                    document.body.style.cursor = "default";
                     var thisID = this.id.substring(4, this.id.length)
                     document.getElementById(thisID).style.textDecoration = "none";
                     this.style.textDecoration = "none";
@@ -1908,6 +1922,7 @@
                         .attr("text-decoration", "none");  
                 }
                 document.getElementById(label.id).onclick = function() {
+                    document.body.style.cursor = "default";
                     var thisID = this.id.substring(4, this.id.length);
                     onClickConstructor(thisID, data, data2);
                 }          
