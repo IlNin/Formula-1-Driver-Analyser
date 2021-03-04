@@ -44,7 +44,8 @@
     
     // User inputs
     var showTotalPoints = true; // Flag that indicates to show the total points instead of the average per race
-    var showWinsInRaces = true; // Flag that indicates to show the wins in races instead of qualifying
+    var compMode = 0; // 0: Show wins in races; 1: Show wins in qualifying; 2: Show points in races
+    var PCAmode = 0; // 0: Show Everyone; 1: Show Top 5; 2: Show Top 10; 3: Show Teammates
     
     var selectedTrackDNF = 0;
     var minYearSelectedDNF = 0;
@@ -53,8 +54,6 @@
     var selectedTrackCons = 0;
     var minYearSelectedCons = 0;
     var maxYearSelectedCons = 0;
-    
-    var PCAmode = 0; // 0: Show Everyone; 1: Show Top 5
     
     // Drivers data
     var allDrivers = []; // List of drivers loaded by the data
@@ -407,7 +406,7 @@
         
         // Restores global variables
         showTotalPoints = true;
-        showWinsInRaces = true;
+        compMode = 0;
         PCAmode = 0;
         circuits = [];
         flagAddCircuits = 0;
@@ -1004,11 +1003,11 @@
         document.getElementById("show-races").checked = true;
         
          document.getElementById('show-races').onclick = function() {
-            showWinsInRaces = true;
+            compMode = 0;
             plotComparisons(data, data2);
         }
         document.getElementById('show-quali').onclick = function() {
-            showWinsInRaces = false;
+            compMode = 1;
             plotComparisons(data, data2);
         }
         
@@ -1043,7 +1042,7 @@
         
         // Finds the relevant data to plot
         relevantData = [];
-        if (showWinsInRaces) {
+        if (compMode == 0) {
             relevantData = findWinsAgainstTeammates(data);
         }
         else {
@@ -1119,7 +1118,7 @@
             .style("text-anchor","end")
             .style("font", "12px times")
             .text(function(d) {
-                if (showWinsInRaces) {
+                if (compMode == 0) {
                     return "Wins In Races";
                 }
                 else {
@@ -1140,7 +1139,7 @@
             .style("text-anchor","start")
             .style("font", "12px times")
             .text(function(d) {
-                if (showWinsInRaces) {
+                if (compMode == 0) {
                     return "Losses In Races";
                 }
                 else {
