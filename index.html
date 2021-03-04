@@ -975,23 +975,34 @@
                 .attr("transform", "translate(" + margins.left + "," + margins.top + ")")
                 .attr("id", "bargraph");
         
-        // Adds radios button in order to switch between total points and average points per race
-        optionsDiv = document.createElement('div');
+        // Adds radios button in order to switch between different comparisons
+        var optionsDiv = document.createElement('div');
         svgCmpDiv.appendChild(optionsDiv);
         optionsDiv.style.fontSize = "14px";
         optionsDiv.innerHTML = "Show: ";
-        winsRacesButton = document.createElement('input');
+        var winsRacesButton = document.createElement('input');
         winsRacesButton.type = 'radio';
         winsRacesButton.name = 'races-or-quali';
         winsRacesButton.id = 'show-races';
         winsRacesButton.value = "races";
-        label = document.createElement('label');
+        var label = document.createElement('label');
         label.innerHTML = "Wins In Races";
         optionsDiv.appendChild(winsRacesButton);
         optionsDiv.appendChild(label);
         optionsDiv.innerHTML += "   ";
-
-        winsQualiButton = document.createElement('input');
+        
+        var pointsRacesButton = document.createElement('input');
+        pointsRacesButton.type = 'radio';
+        pointsRacesButton.name = 'races-or-quali';
+        pointsRacesButton.id = 'show-points-races';
+        pointsRacesButton.value = "races";
+        label = document.createElement('label');
+        label.innerHTML = "Points In Races";
+        optionsDiv.appendChild(pointsRacesButton);
+        optionsDiv.appendChild(label);
+        optionsDiv.innerHTML += "   ";
+        
+        var winsQualiButton = document.createElement('input');
         winsQualiButton.type = 'radio';
         winsQualiButton.name = 'races-or-quali';
         winsQualiButton.id = 'show-quali';
@@ -1002,8 +1013,12 @@
         optionsDiv.appendChild(label);
         document.getElementById("show-races").checked = true;
         
-         document.getElementById('show-races').onclick = function() {
+        document.getElementById('show-races').onclick = function() {
             compMode = 0;
+            plotComparisons(data, data2);
+        }
+        document.getElementById('show-points-races').onclick = function() {
+            compMode = 2;
             plotComparisons(data, data2);
         }
         document.getElementById('show-quali').onclick = function() {
@@ -1042,7 +1057,7 @@
         
         // Finds the relevant data to plot
         relevantData = [];
-        if (compMode == 0) {
+        if (compMode == 0 || compMode == 2) {
             relevantData = findWinsAgainstTeammates(data);
         }
         else {
@@ -1050,7 +1065,7 @@
         }
         
         // Initializes the x scale and finds the range of seasons
-        x = d3.scaleBand()
+        xComp = d3.scaleBand()
             .domain(relevantData.map(function(d) {
                 return d.key.substring(0, 4);
             }))
@@ -1090,7 +1105,7 @@
             .range([0, chart_dimensions.height/2]);
             
         // Initializes the axis
-        xAxis = d3.axisBottom(x).ticks().tickFormat(d3.format("d"));
+        xAxis = d3.axisBottom(xComp).ticks().tickFormat(d3.format("d"));
         yTopAxis = d3.axisLeft(yTop).ticks(4).tickFormat(d3.format("d"));
         yBottomAxis = d3.axisLeft(yBottom).ticks(4).tickFormat(d3.format("d"));
         
@@ -1114,12 +1129,22 @@
             .attr("class","label")
             .attr("transform","rotate(-90)")
             .attr("y", 6)
-            .attr("dy","-2.5em")
+            .attr("dy", function(d) {
+                if (compMode != 2) {
+                    return "-2.5em";
+                }
+                else {
+                    return "-3.0em";
+                }
+            })
             .style("text-anchor","end")
             .style("font", "12px times")
             .text(function(d) {
                 if (compMode == 0) {
                     return "Wins In Races";
+                }
+                else if (compMode == 2) {
+                    return "Points In Races";
                 }
                 else {
                     return "Wins In Qualy";
@@ -1135,12 +1160,22 @@
             .attr("class","label")
             .attr("transform", "translate(0," + (chart_dimensions.height) + ")" + "rotate(-90)")
             .attr("y", 6)
-            .attr("dy","-2.5em")
+            .attr("dy", function(d) {
+                if (compMode != 2) {
+                    return "-2.5em";
+                }
+                else {
+                    return "-3.0em";
+                }
+            })
             .style("text-anchor","start")
             .style("font", "12px times")
             .text(function(d) {
                 if (compMode == 0) {
                     return "Losses In Races";
+                }
+                else if (compMode == 2) {
+                    return "Points In Qualy";
                 }
                 else {
                     return "Losses In Qualy";
@@ -1206,8 +1241,8 @@
                         })
                         .style("stroke", "white")
                         .style("stroke-width", 1)
-                        .attr("x", x(year)) 
-                        .attr("width", x.bandwidth)
+                        .attr("x", xComp(year)) 
+                        .attr("width", xComp.bandwidth)
                         .attr("y", yTop(0))
                         .attr("height", 0);
                 
@@ -1251,15 +1286,27 @@
                     teammate = id.substring(10, id.length);
                     text = "";
                     color = "";
-                    if (flagTop == "0") {     
-                        text = "[Wins against " + teammate.replace(/_/g, ' ') + ": " + d.selectedDriverWins + "] ";
+                    if (flagTop == "0") {    
+                        if (compMode != 2) {
+                            text = "[Wins against ";
+                        }
+                        else {
+                            text = "[Points against ";
+                        }
+                        text += teammate.replace(/_/g, ' ') + ": " + d.selectedDriverWins + "] ";
                         color = colorsTeammates(selectedDriver);
                     }
                     else {
-                        text = "[Losses against " + teammate.replace(/_/g, ' ') + ": " + d.teammateWins + "] ";
+                        if (compMode != 2) {
+                            text = "[Losses against ";
+                        }
+                        else {
+                            text = "[Points won by ";
+                        }
+                        text += teammate.replace(/_/g, ' ') + ": " + d.teammateWins + "] ";
                         color = colorsTeammates(teammate);
                     }
-                    drawOnMouseOverLabel(coords, cmpSvg, text, color, year, minYear, maxYear);
+                    drawOnMouseOverLabel(coords, cmpSvg, text, color, year, xComp.domain()[0], xComp.domain()[xComp.domain().length-1]);
                 });
                 
                 bar.on("mouseout", function(d) {
@@ -2715,6 +2762,7 @@
             selectedDriverPosition = 0;
             name = "";
             surname = "";
+            points = 0;
             findTeammates = false;
             for (j = 0; j < constructorResults.length; j++) {
                 if ((constructorResults[j].surname + "_" + constructorResults[j].name) == selectedDriver && findTeammates == false) {
@@ -2723,6 +2771,7 @@
                     selectedDriverPosition = constructorResults[j].position;
                     name = constructorResults[j].name;
                     surname = constructorResults[j].surname;
+                    points = constructorResults[j].points;
                     j = -1;
                 }
                 else if ((constructorResults[j].surname + "_" + constructorResults[j].name) != selectedDriver && findTeammates == true) {
@@ -2753,9 +2802,11 @@
                         selectedDriverSurname: surname,
                         selectedDriverName: name,
                         selectedDriverPosition: selectedDriverPosition,
+                        selectedDriverPoints: points,
                         teammateSurname: constructorResults[j].surname,
                         teammateName: constructorResults[j].name,
-                        teammatePosition: constructorResults[j].position
+                        teammatePosition: constructorResults[j].position,
+                        teammatePoints: constructorResults[j].points
                         }
                     newTuples.push(newTuple);
                 }
@@ -2771,6 +2822,9 @@
             .rollup(function(d) {
                 return {
                     selectedDriverWins: d3.sum(d, function(g) {
+                        if (compMode == 2) {
+                            return g.selectedDriverPoints;
+                        }
                         if (g.selectedDriverPosition == "\\N" && g.teammatePosition != "\\N") {
                             return 0;
                         }
@@ -2786,6 +2840,9 @@
                         return 0;
                     }),
                     teammateWins: d3.sum(d, function(g) {
+                        if (compMode == 2) {
+                            return g.teammatePoints;
+                        }
                         if (g.selectedDriverPosition == "\\N" && g.teammatePosition != "\\N") {
                             return 1;
                         }
