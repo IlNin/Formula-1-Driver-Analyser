@@ -981,7 +981,7 @@
         // Initalizes an empty svg for the points bars
         cmpSvg = d3.select('#comparisons')
             .append('svg')
-                .attr("width", container_dimensions.width)
+                .attr("width", container_dimensions.width-14)
                 .attr("height", container_dimensions.height)
                 //.style("background-color", "red")
             .append("g")
@@ -1051,10 +1051,10 @@
         // Initializes the empty svg for the bar graph legend
         svgCmpLegend = d3.select('#cmplegendtable')
             .append('svg')
-                .attr("width", legend_width)
+                .attr("width", legend_width+14)
                 .attr("height", container_dimensions.height)
                 .attr("class", "svgCmp")
-                // .style("background-color", "red")
+                //.style("background-color", "red")
                 .append("g")
                     .attr("transform", "translate(" + 0 + "," + margins.top/4 + ")")
                     .attr("id","cmplegendtable");
@@ -1082,7 +1082,7 @@
             .domain(relevantData.map(function(d) {
                 return d.key.substring(0, 4);
             }))
-            .range([0, chart_dimensions.width])
+            .range([0, chart_dimensions.width-14])
             .padding(.5);
         
         // Initializes the y scale and finds the biggest number of wins/losses in order to set up the scale
@@ -1129,7 +1129,7 @@
             .call(xAxis);
         cmpSvg.append("text")
             .attr("class","label")
-            .attr("x", chart_dimensions.width)
+            .attr("x", chart_dimensions.width-14)
             .attr("y", chart_dimensions.height+(margins.bottom-10))
             .style("text-anchor","end")
             .text("Seasons");
@@ -1370,10 +1370,31 @@
                 return "translate(0,"+((i+1)*sizeSquare+i*5)+")";
             });
         
+        // Draws the small magnifying glasses
+        var glasses = svgCmpLegend.selectAll("image")
+            .data(teammates)
+            .enter()
+            .append("g")
+            .attr("transform", function(d,i){
+                return "translate(0,"+((i+1)*sizeSquare+i*5)+")";
+            })
+            .append("svg:image")
+            .attr("xlink:href", "find2.png")
+            .attr("width", sizeSquare+4)
+			.attr("height", sizeSquare+4)
+            .attr("y", -2)
+            .style("opacity", function(d) {
+                if (allDrivers.includes(d)) {
+                    return 1;
+                }
+                return 0;
+            });
+        
         // Draws the small colored rectangles
         legend.append("rect")
 			.attr("width", sizeSquare)
 			.attr("height", sizeSquare)
+            .attr("x", sizeSquare+5)
             .attr("class", function(d) {
                 return "rect"+d;
             })
@@ -1389,7 +1410,7 @@
             .attr("class", function(d) {
                 return "text"+d;
             })
-            .attr("x", sizeSquare+5)
+            .attr("x", (sizeSquare*2)+10)
             .attr("y", sizeSquare/2)
             .attr("dy", ".35em")
             .style("font", "12px times")
@@ -1402,7 +1423,7 @@
             .text(function(d) {
                 return d.replace(/_/g, ' ');
             });
-        
+           
         // Add input events to the legend
         legend
             .on("mouseover", function(d) {   
@@ -1415,6 +1436,23 @@
             })
             .on("click", function(d) {
                 onClickDriver(d, data, data2);
+            });
+       
+       // Add input events to the magnifying glasses
+       glasses
+            .on("mouseover", function(d) {
+                if (allDrivers.includes(d)) {
+                    document.body.style.cursor = "pointer";
+                }
+            })
+            .on("mouseout", function(d) {
+                document.body.style.cursor = "default";
+            })
+            .on("click", function(d) {
+                if (allDrivers.includes(d)) {
+                    selectedDriver = d;
+                    initializeChartsLayout(data, data2);
+                }
             });
     }
     
@@ -2003,7 +2041,7 @@
         // Initalizes an empty svg for the PCA chart
         simSvg = d3.select('#similar-drivers')
             .append('svg')
-                .attr("width", small_container_dimensions.width-119)
+                .attr("width", small_container_dimensions.width-119-14)
                 .attr("height", small_container_dimensions.height+25)
                 //.style("background-color", "red")
             .append("g")
@@ -2034,7 +2072,7 @@
         // Initializes the empty svg for the legend
         svgSimLegend = d3.select('#simlegendtable')
             .append('svg')
-                .attr("width", legend_width)
+                .attr("width", legend_width+14)
                 .attr("height", small_container_dimensions.height-30)
                 .attr("class", "svgSim")
                 //.style("background-color", "red")
@@ -2204,7 +2242,7 @@
             .domain(d3.extent(relevantData, function(d) {
                 return d.pca1;
             }))
-            .range([0, small_chart_dimensions.width-110]);
+            .range([0, small_chart_dimensions.width-110-14]);
         pca2Scale = d3.scaleLinear()
             .domain(d3.extent(relevantData, function(d) {
                 return d.pca2;
@@ -2223,7 +2261,7 @@
             .call(pca1Axis);
         simSvg.append("text")
             .attr("class","label")
-            .attr("x", small_chart_dimensions.width-110)
+            .attr("x", small_chart_dimensions.width-110-14)
             .attr("y", 212)
             .style("text-anchor","end")
             .style("font", "12px times")
@@ -2336,10 +2374,31 @@
                 return "translate(0,"+((i+1)*sizeSquare+i*5)+")";
             });
         
+        // Draws the small magnifying glasses
+        var glasses = svgSimLegend.selectAll("image")
+            .data(notableDrivers)
+            .enter()
+            .append("g")
+            .attr("transform", function(d,i){
+                return "translate(0,"+((i+1)*sizeSquare+i*5)+")";
+            })
+            .append("svg:image")
+            .attr("xlink:href", "find2.png")
+            .attr("width", sizeSquare+4)
+			.attr("height", sizeSquare+4)
+            .attr("y", -2)
+            .style("opacity", function(d) {
+                if (allDrivers.includes(d)) {
+                    return 1;
+                }
+                return 0;
+            });
+        
         // Draws the small colored rectangles
         legend.append("rect")
 			.attr("width", sizeSquare)
 			.attr("height", sizeSquare)
+            .attr("x", sizeSquare+4)
             .attr("class", function(d) {
                 return "rect"+d;
             })
@@ -2358,7 +2417,7 @@
             .attr("class", function(d) {
                 return "text"+d;
             })
-            .attr("x", sizeSquare+5)
+            .attr("x", (sizeSquare*2)+10)
             .attr("y", sizeSquare/2)
             .attr("dy", ".35em")
             .style("font", "12px times")
@@ -2390,6 +2449,23 @@
             })
             .on("click", function(d) {
                 onClickDriver(d, data, data2);
+            });
+       
+        // Add input events to the magnifying glasses
+        glasses
+            .on("mouseover", function(d) {
+                if (allDrivers.includes(d)) {
+                    document.body.style.cursor = "pointer";
+                }
+            })
+            .on("mouseout", function(d) {
+                document.body.style.cursor = "default";
+            })
+            .on("click", function(d) {
+                if (allDrivers.includes(d)) {
+                    selectedDriver = d;
+                    initializeChartsLayout(data, data2);
+                }
             });
     }
     
