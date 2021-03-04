@@ -119,6 +119,11 @@
         menu.id = "menu";
         aboveWrapper.appendChild(menu);
         
+        var label = document.createElement('label');
+        label.innerHTML = "Use the time slider to insert in the drop-down the pilots who drove in that period!";
+        label.style.fontSize = "13px";
+        menu.append(label);
+        
         // Initializes an empty svg for the time slider
         var svgDriversTimeSliderDiv = document.createElement('div');
         svgDriversTimeSliderDiv.id = "driverstimeslider";
@@ -126,7 +131,7 @@
         driversTimeSliderSvg = d3.select('#driverstimeslider')
             .append('svg')
                 .attr("width", 422)
-                .attr("height", 40)
+                .attr("height", 28)
                 //.style("background-color", "red")
             .append("g")
                 .attr("transform", "translate(" + 10 + "," + 6 + ")")
@@ -378,6 +383,10 @@
                 addDriversToTitle();
             });
         d3.select(".driverstimeslider").call(sliderDrivers); 
+        
+        // Move all ticks closer to the slider
+        d3.selectAll('text')
+            .attr('dy', "-5");
     
         document.getElementById("select-driver").onchange = function() { 
             if (document.getElementById("select-driver").value > 0) {  // A valid driver is selected: enables search button
@@ -455,7 +464,7 @@
         var driverSelectedDiv = document.createElement('div');
         driverSelectedDiv.id = "selecteddriver";
         driverSelectedDiv.innerHTML = "<b>- " + selectedDriver.replace(/_/g, ' ') + " -</b><br>";
-        driverSelectedDiv.innerHTML += "<b><i>Points: </i></b>" + points + " --- <b><i>Starts: </i></b>" + starts + " --- <b><i>Finishes: </i></b>" + finishes + " --- <b><i>Podiums: </i></b>" + podiums + " --- <b><i>Wins: </i></b>" + wins + " --- <b><i>Poles: </i></b>" + poles + " --- <b><i>Championships: </i></b>" + championships;
+        driverSelectedDiv.innerHTML += "<b><i>Points: </i></b>" + points + " &nbsp&nbsp&nbsp&nbsp<b><i>Starts: </i></b>" + starts + " &nbsp&nbsp&nbsp&nbsp<b><i>Finishes: </i></b>" + finishes + " &nbsp&nbsp&nbsp&nbsp<b><i>Podiums: </i></b>" + podiums + " &nbsp&nbsp&nbsp&nbsp<b><i>Wins: </i></b>" + wins + " &nbsp&nbsp&nbsp&nbsp<b><i>Poles</i></b>*<b><i>: </i></b>" + poles + " &nbsp&nbsp&nbsp&nbsp<b><i>Championships: </i></b>" + championships;
         if (years.length > 0) {
             driverSelectedDiv.innerHTML += " [";
             for (i = 0; i < years.length-1; i++) {
@@ -463,6 +472,10 @@
             }
             driverSelectedDiv.innerHTML += years[years.length-1] + "]";
         }
+        var label = document.createElement('label');
+        label.innerHTML = " &nbsp&nbsp&nbsp&nbsp*: May contain incomplete data!";
+        label.style.fontSize = "11px";
+        driverSelectedDiv.append(label);
         driverSelectedDiv.onmouseover = function() {
             writeOnAbout(0);
         }
@@ -959,7 +972,7 @@
         // Initializes the div that contains the svg area for the comparisons   
         svgCmpDiv = document.createElement('div');
         svgCmpDiv.id = "comparisons";
-        svgCmpDiv.innerHTML = "<b>Wins/Losses Against Teammates</b><br>";
+        svgCmpDiv.innerHTML = "<b>Comparisons Against Teammates</b><br>";
         svgCmpDiv.onmouseover = function() {
             writeOnAbout(2);
         }
@@ -2015,7 +2028,7 @@
         labelAchievements.style.fontSize = "12px";
         labelAchievements.innerHTML = "<b>No Driver Highlighted</b><br>";
         labelAchievements.innerHTML += "Points: ? - Starts: ? - Finishes: ? - Podiums: ? <br>";
-        labelAchievements.innerHTML += "Wins: ? - Poles: ? - Championships ?";
+        labelAchievements.innerHTML += "Wins: ? - Poles*: ? - Championships ?";
         textDiv.appendChild(labelAchievements);
         
         // Initializes the empty svg for the legend
@@ -2404,7 +2417,7 @@
         if (allDrivers.includes(driver)) {
             labelAchievements.innerHTML = "<b> "+ driver.replace(/_/g, ' ') + "</b><br>";
             labelAchievements.innerHTML += "Points: " + currentDriverAchievements.points + " - Starts: " + currentDriverAchievements.starts + " - Finishes: " + currentDriverAchievements.finishes + " - Podiums: " + currentDriverAchievements.podiums + "<br>";
-            labelAchievements.innerHTML += "Wins: " + currentDriverAchievements.wins + " - Poles: " + currentDriverAchievements.poles + " - Championships " + currentDriverAchievements.championships;
+            labelAchievements.innerHTML += "Wins: " + currentDriverAchievements.wins + " - Poles*: " + currentDriverAchievements.poles + " - Championships " + currentDriverAchievements.championships;
         }
         
         // Highlights the right bars in the teammate chart
@@ -2437,7 +2450,7 @@
         }
         labelAchievements.innerHTML = "<b>No Driver Highlighted</b><br>";
         labelAchievements.innerHTML += "Points: ? - Starts: ? - Finishes: ? - Podiums: ? <br>";
-        labelAchievements.innerHTML += "Wins: ? - Poles: ? - Championships ?";
+        labelAchievements.innerHTML += "Wins: ? - Poles*: ? - Championships ?";
             
         // Restores everything in the teammate chart
         cmpSvg.selectAll("[class^=rect]")
@@ -2633,7 +2646,7 @@
     // Writes the right text on the upper right section of the application
     function writeOnAbout(index) {
         // Change some attributes of the div
-        if (index >= 0 && index <= 2) {
+        if (index >= 0 && index <= 1) {
             about.style.paddingTop = "5px";
             about.style.fontSize = "13px";
             about.style.height = "71px";
@@ -2653,12 +2666,12 @@
             
             about.innerHTML = "<b>- POINTS PER SEASON -</b><br>";
             about.innerHTML += "This bar chart shows the points achieved by the selected driver per season.<br>"
-            about.innerHTML += "<b>Interactions</b>: Clicking on bars to calculate averages; Clicking on the legend to filter data about a constructor.";
+            about.innerHTML += "<b>Interactions</b>: Switching between two units of measure; Clicking on bars to calculate averages; Clicking on the legend to filter data about a constructor.";
         }
         else if (index == 2) {
-            about.innerHTML = "<b>- WINS/LOSSES AGAINST TEAMMATES -</b><br>";
-            about.innerHTML += "This bar chart shows how many times the selected driver has placed better than their teammates across the seasons, both in races and qualifying.<br>";
-            about.innerHTML += "<b>Interactions</b>: Clicking on the legend to filter data about a teammate.";
+            about.innerHTML = "<b>- COMPARISONS AGAINST TEAMMATES -</b><br>";
+            about.innerHTML += "This bar chart shows how many times the selected driver has placed better than their teammates across the seasons or the differences in points achieved.<br>";
+            about.innerHTML += "<b>Interactions</b>: Clicking on the legend to filter data about a teammate; Switching between wins/losses (in race or qualy) and points achieved.";
         }
         else if (index == 3) {
             about.innerHTML = "<b>- DNFs' CAUSES -</b><br>";
@@ -2673,7 +2686,7 @@
         else if (index == 5) {
             about.innerHTML = "<b>- PLACE IN THE SPORT'S HISTORY -</b><br>";
             about.innerHTML += "This scatter plot chart shows the placement of the selected driver in terms of career achievements, alongside other drivers since 1994. The closeness of the points was calculated using PCA on multidimensional data.<br>";
-            about.innerHTML += "<b>Interactions</b>: Clicking on the legend to filter data about a driver."
+            about.innerHTML += "<b>Interactions</b>: Clicking on the legend to filter data about a driver; Focusing on key areas."
         }
     }
           

@@ -16,6 +16,7 @@
 }
 #menu {
     border: 2px solid black;
+    font-size: 14px;
     width: 435px;
     height: 70px;
     border-left: none;
