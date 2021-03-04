@@ -486,8 +486,8 @@
         document.body.append(bottomWrapper);
         
         // Prepares all the layouts in the bottom wrapper
-        prepareDNF(data);
-        prepareConsistency(data);
+        prepareDNF(data, data2);
+        prepareConsistency(data, data2);
         preparePCA(data, data2);
         
         // Appends the yellow ending div
@@ -899,15 +899,19 @@
         // Add input events to the legend
         legend
             .on("mouseover", function(d) {
-                // Highlights the entry in the legend and outlines the right bars, both in the points and teammates charts
+                // Highlights the entry in the legend
                 document.body.style.cursor = "pointer";
                 d3.select(".rect"+d)
                     .attr("stroke", "black");
                 d3.select(".text"+d)
                     .attr("text-decoration", "underline overline");
+                
+                // Highlights the bars
                 if (nBarsClicked == 0) {
+                    // First in the points chart
                     barSvg.selectAll("[class*=" + d + "]")
                         .style("stroke", "black"); 
+                    // Then in the teammates chart
                     cmpSvg.selectAll("[class^=rect]")
                         .style("stroke", function() {
                             if (d3.select(this).attr("id") == d) {
@@ -915,7 +919,6 @@
                                 if (!driversHovered.includes(hoveredDriver)) {
                                     driversHovered.push(hoveredDriver);
                                 }
-                                console.log(driversHovered);
                                 return "black";
                             }
                             
@@ -939,50 +942,7 @@
                 driversHovered = [];
             })
             .on("click", function(d) {
-                // Hides the data regarding that constructor in all the charts
-                if (!constructorsDisabled.includes(d)) {
-                    if (constructorsDisabled.length == constructors.length-1) {
-                        alert("Can't remove all constructors!");
-                        return;
-                    }
-                    if ((driversHovered.length + teammatesDisabled.length) == teammates.length-1) {
-                        alert("Removing this constructor may remove all teammates!");
-                        return;
-                    }
-                    constructorsDisabled.push(d);
-                    
-                    // Disables the entry in the constructor legend
-                    d3.select(".rect"+d)
-                        .style("fill", "grey");
-                    d3.select(".text"+d)
-                        .style("fill", "grey");  
-                }
-                // Restores the data regarding that constructor in all the charts
-                else {
-                    var index = constructorsDisabled.indexOf(d);
-                    constructorsDisabled.splice(index, 1);
-                    lastConstructorEnabled = d;
-                    
-                    // Restores the entry in the legend
-                    d3.select(".rect"+d)
-                        .style("fill", colors(d));
-                    d3.select(".text"+d)
-                        .style("fill", "black");
-                }
-                
-                // Refresh the data in the charts
-                plotPointsAchieved(data, data2);
-                plotComparisons(data, data2);
-                maxValueDNF = 0;
-                minYearSelectedDNF = minYear;
-                maxYearSelectedDNF = maxYear;
-                minYearSelectedCons = minYear;
-                maxYearSelectedCons = maxYear;
-                drawDNFTimeSlider(data);
-                plotDNF(data, minYearSelectedDNF, maxYearSelectedDNF, selectedTrackDNF);
-                drawConsistencyTimeSlider(data);
-                plotConsistency(data, minYearSelectedCons, maxYearSelectedCons, selectedTrackCons);
-                plotPCA(data, data2);
+                onClickConstructor(d, data, data2);
             });          
     }
     
@@ -1377,111 +1337,21 @@
         
         // Add input events to the legend
         legend
-            .on("mouseover", function(d) {
-                // Highlights the entry in the legend and outlines the right bars
+            .on("mouseover", function(d) {   
                 document.body.style.cursor = "pointer";
-                d3.selectAll(".rect"+d)
-                    .attr("stroke", "black");
-                d3.selectAll(".text"+d)
-                    .attr("text-decoration", "underline overline");    
-
-                if (d == selectedDriver) {
-                    cmpSvg.selectAll("[class^=rect0]")
-                        .style("stroke", "black");
-                }
-                else {
-                    cmpSvg.selectAll("[class^=rect0][class$=" + d + "]")
-                        .style("stroke", "black");
-                    cmpSvg.selectAll("[class^=rect1][class$=" + d + "]")
-                        .style("stroke", "black");
-                }
-                
-                // Highlights the right point in the PCA chart
-                if (!allDrivers.includes(d)) {
-                    return;
-                }
-                simSvg.select("."+d)
-                        .attr("r", 8);
-                currentDriverAchievements = [];
-                for (i = 0; i < achievements.length; i++) {
-                    if (achievements[i].driver == d) {
-                        currentDriverAchievements = achievements[i];
-                    }
-                }
-                labelAchievements.innerHTML = "<b>"+d.replace(/_/g, ' ')+"</b><br>";
-                labelAchievements.innerHTML += "Points: " + currentDriverAchievements.points + " - Starts: " + currentDriverAchievements.starts + " - Finishes: " + currentDriverAchievements.finishes + " - Podiums: " + currentDriverAchievements.podiums + "<br>";
-                labelAchievements.innerHTML += "Wins: " + currentDriverAchievements.wins + " - Poles: " + currentDriverAchievements.poles + " - Championships " + currentDriverAchievements.championships;
+                onMouseOverDriver(d); 
             })
             .on("mouseout", function(d) {
-                // Restores everything
                 document.body.style.cursor = "default";
-                d3.selectAll(".rect"+d)
-                    .attr("stroke", "none");
-                d3.selectAll(".text"+d)
-                    .attr("text-decoration", "none");
-                cmpSvg.selectAll("[class^=rect]")
-                    .style("stroke", "white")
-                    
-                simSvg.select("."+d)
-                        .attr("r", function() {
-                            if (notableDrivers.includes(d)) {
-                                return 6;
-                            }
-                            return 3;
-                       });
-                labelAchievements.innerHTML = "<b>No Driver Highlighted</b><br>";
-                labelAchievements.innerHTML += "Points: ? - Starts: ? - Finishes: ? - Podiums: ? <br>";
-                labelAchievements.innerHTML += "Wins: ? - Poles: ? - Championships ?";
+                onMouseOutDriver(d);
             })
             .on("click", function(d) {
-                if (!teammatesDisabled.includes(d)) {
-                    if (d == selectedDriver) {
-                        alert("Can't filter out the selected driver!");
-                        return;
-                    }
-                    if (teammatesDisabled.length == teammates.length-2) {
-                        alert("Can't filter out all teammates!");
-                        return;
-                    }
-                    teammatesDisabled.push(d);
-                    
-                    // Disables the entry in the constructor legend
-                    d3.selectAll(".rect"+d)
-                        .style("fill", "grey");
-                    d3.selectAll(".text"+d)
-                        .style("fill", "grey");
-                }
-                else {
-                    var index = teammatesDisabled.indexOf(d);
-                    teammatesDisabled.splice(index, 1);
-                    lastTeammateEnabled = d;
-                    
-                    // Restores the entry in the legend
-                    d3.selectAll(".rect"+d)
-                        .style("fill", colorsTeammates(d));
-                    d3.selectAll(".text"+d)
-                        .style("fill", "black");
-               }
-               var lastConstructorsDisabledSize = constructorsDisabled.length;
-               plotComparisons(data, data2);
-               plotPCA(data, data2);
-               if (constructorsDisabled.length != lastConstructorsDisabledSize) {
-                    plotPointsAchieved(data, data2);
-                    maxValueDNF = 0;
-                    minYearSelectedDNF = minYear;
-                    maxYearSelectedDNF = maxYear;
-                    minYearSelectedCons = minYear;
-                    maxYearSelectedCons = maxYear;
-                    drawDNFTimeSlider(data);
-                    plotDNF(data, minYearSelectedDNF, maxYearSelectedDNF, selectedTrackDNF);
-                    drawConsistencyTimeSlider(data);
-                    plotConsistency(data, minYearSelectedCons, maxYearSelectedCons, selectedTrackCons);
-               }
+                onClickDriver(d, data, data2);
             });
     }
     
     // Prepares the layout for the chart that displays the causes of DNFs
-    function prepareDNF(data) {
+    function prepareDNF(data, data2) {
         // Initializes the div that contains the time slider and svg area for the dnf 
         var svgDNFDiv = document.createElement('div');
         svgDNFDiv.id = "dnf";
@@ -1507,7 +1377,7 @@
         // Adds the track selector with input event
         var svgDNFDiv2 = document.createElement('div');
         svgDNFDiv.appendChild(svgDNFDiv2);
-        svgDNFDiv.style.fontSize = "14px";
+        svgDNFDiv2.style.fontSize = "14px";
         svgDNFDiv2.appendChild(document.createTextNode("Show DNFs from: "));
         var selectTrack = document.createElement('select');
         selectTrack.id = "select-track-dnf";
@@ -1519,7 +1389,7 @@
         svgDNFDiv2.appendChild(selectTrack);
         document.getElementById("select-track-dnf").onchange = function() { 
             selectedTrackDNF = this.value;
-            plotDNF(data, minYearSelectedDNF, maxYearSelectedDNF, selectedTrackDNF);
+            plotDNF(data, data2, minYearSelectedDNF, maxYearSelectedDNF, selectedTrackDNF);
         }
         
         // Initalizes an empty svg for the lollipop chart
@@ -1543,12 +1413,12 @@
         // Plots the timeslider and lollipop graph that displays data about the causes of DNFs
         minYearSelectedDNF = minYear;
         maxYearSelectedDNF = maxYear;
-        drawDNFTimeSlider(data);
-        plotDNF(data, minYearSelectedDNF, maxYearSelectedDNF, selectedTrackDNF);
+        drawDNFTimeSlider(data, data2);
+        plotDNF(data, data2, minYearSelectedDNF, maxYearSelectedDNF, selectedTrackDNF);
     }
     
     // Draws a time slider for the DNF lollipop chart
-    function drawDNFTimeSlider(data) {
+    function drawDNFTimeSlider(data, data2) {
         // Erase previous data
         dnfTimeSliderSvg.selectAll('*').remove();
         
@@ -1570,13 +1440,13 @@
                 }
                 minYearSelectedDNF = val[0];
                 maxYearSelectedDNF = val[1];
-                plotDNF(data, minYearSelectedDNF, maxYearSelectedDNF, selectedTrackDNF);
+                plotDNF(data, data2, minYearSelectedDNF, maxYearSelectedDNF, selectedTrackDNF);
             });
         dnfTimeSliderSvg.call(sliderDNF); 
     }
         
     // Plots the lollipop graph that displays data about the causes of DNFs
-    function plotDNF(data, selectedMinYear, selectedMaxYear, selectedTrack) {
+    function plotDNF(data, data2, selectedMinYear, selectedMaxYear, selectedTrack) {
         // Erase previous data
         dnfSvg.selectAll('*').remove();
         
@@ -1690,11 +1560,47 @@
         labelTotalRacesDNF.innerHTML = "<b>Finishes</b>: " + relevantDataDNF[1].value + " (" + finishesRatio.toFixed(2) + "%)";
         sumDNF = sortedRelevantDataDNF[0].value + sortedRelevantDataDNF[1].value + sortedRelevantDataDNF[2].value;
         dnfRatio = (sumDNF*100)/relevantDataDNF[0].value;
-        labelTotalRacesDNF.innerHTML += "&nbsp&nbsp&nbsp<b>DNFs</b>: " +  sumDNF + " (" + dnfRatio.toFixed(2) + "%)";
+        labelTotalRacesDNF.innerHTML += "&nbsp&nbsp&nbsp<b>DNFs</b>: " +  sumDNF + " (" + dnfRatio.toFixed(2) + "%)<br>";
+        
+        // Prints the removed constructors
+        if (constructorsDisabled.length > 0) {
+            labelTotalRacesDNF.innerHTML += "Constructors filtered out: [";
+            for (i = 0; i < constructorsDisabled.length; i++) {
+                var label = document.createElement('label');
+                label.innerHTML = constructorsDisabled[i].replace(/_/g, ' ');
+                if (i == constructorsDisabled.length-1) {
+                    label.innerHTML += "]";
+                }
+                else {
+                    label.innerHTML += ", ";
+                }
+                label.id = constructorsDisabled[i];
+                labelTotalRacesDNF.appendChild(label);
+                document.getElementById(label.id).onmouseover = function() {
+                    this.style.textDecoration = "underline overline";
+                    document.getElementById("cons" + this.id).style.textDecoration = "underline overline";
+                    d3.selectAll(".rect" + this.id)
+                        .attr("stroke", "black");
+                    d3.selectAll(".text" + this.id)
+                        .attr("text-decoration", "underline overline");  
+                }
+                document.getElementById(label.id).onmouseout = function() {
+                    this.style.textDecoration = "none";
+                    document.getElementById("cons" + this.id).style.textDecoration = "none";
+                    d3.selectAll(".rect" + this.id)
+                        .attr("stroke", "none");
+                    d3.selectAll(".text" + this.id)
+                        .attr("text-decoration", "none");  
+                }
+                document.getElementById(label.id).onclick = function() {
+                    onClickConstructor(this.id, data, data2);
+                }          
+            }
+        }
     }
     
     // Prepares the layout for the chart that displays the consistency of the placements
-    function prepareConsistency(data) {
+    function prepareConsistency(data, data2) {
         // Initializes the div that contains the time slider and svg area for the placements
         svgConsDiv = document.createElement('div');
         svgConsDiv.id = "consistency";
@@ -1720,7 +1626,7 @@
         // Adds the track selector with input event
         var svgConsDiv2 = document.createElement('div');
         svgConsDiv.appendChild(svgConsDiv2);
-        svgConsDiv.style.fontSize = "14px";
+        svgConsDiv2.style.fontSize = "14px";
         svgConsDiv2.appendChild(document.createTextNode("Show placements from: "));
         var selectTrack = document.createElement('select');
         selectTrack.id = "select-track-cons";
@@ -1732,7 +1638,7 @@
         svgConsDiv2.appendChild(selectTrack);
         document.getElementById("select-track-cons").onchange = function() { 
             selectedTrackCons = this.value;
-            plotConsistency(data, minYearSelectedCons, maxYearSelectedCons, selectedTrackCons);
+            plotConsistency(data, data2, minYearSelectedCons, maxYearSelectedCons, selectedTrackCons);
         }
         
         // Initalizes an empty svg for box plot
@@ -1756,12 +1662,12 @@
         // Draws the time slider and the boxplot
         minYearSelectedCons = minYear;
         maxYearSelectedCons = maxYear;
-        drawConsistencyTimeSlider(data);
-        plotConsistency(data, minYearSelectedCons, maxYearSelectedCons, selectedTrackCons);
+        drawConsistencyTimeSlider(data, data2);
+        plotConsistency(data, data2, minYearSelectedCons, maxYearSelectedCons, selectedTrackCons);
     }
     
     // Draws a time slider fot the consistency plot box
-    function drawConsistencyTimeSlider(data) {
+    function drawConsistencyTimeSlider(data, data2) {
         // Erase previous data
         consTimeSliderSvg.selectAll('*').remove();
        
@@ -1783,13 +1689,13 @@
                 }
                 minYearSelectedCons = val[0];
                 maxYearSelectedCons = val[1];
-                plotConsistency(data, minYearSelectedCons, maxYearSelectedCons, selectedTrackCons);
+                plotConsistency(data, data2, minYearSelectedCons, maxYearSelectedCons, selectedTrackCons);
             });
         consTimeSliderSvg.call(sliderConsistency); 
     }
     
     // Plots the plot box with the placements of the driver
-    function plotConsistency(data, selectedMinYear, selectedMaxYear, selectedTrack) {
+    function plotConsistency(data, data2, selectedMinYear, selectedMaxYear, selectedTrack) {
         // Erase previous data
         consSvg.selectAll('*').remove();
         
@@ -1967,7 +1873,46 @@
         var podiumsRatio = (stats.podiums*100)/stats.starts;
         labelTotalRacesCons.innerHTML += "<b>Finishes</b>: " + relevantData.length + " (" + finishesRatio.toFixed(2) + "%)";
         labelTotalRacesCons.innerHTML += "&nbsp&nbsp&nbsp<b>Wins</b>: " + stats.wins + " (" + winsRatio.toFixed(2) + "%)";
-        labelTotalRacesCons.innerHTML += "&nbsp&nbsp&nbsp<b>Podiums</b>: " + stats.podiums + " (" + podiumsRatio.toFixed(2) + "%)";
+        labelTotalRacesCons.innerHTML += "&nbsp&nbsp&nbsp<b>Podiums</b>: " + stats.podiums + " (" + podiumsRatio.toFixed(2) + "%)<br>";
+        
+        // Prints the removed constructors
+        if (constructorsDisabled.length > 0) {
+            labelTotalRacesCons.innerHTML += "Constructors filtered out: [";
+            for (i = 0; i < constructorsDisabled.length; i++) {
+                var label = document.createElement('label');
+                label.innerHTML = constructorsDisabled[i].replace(/_/g, ' ');
+                if (i == constructorsDisabled.length-1) {
+                    label.innerHTML += "]";
+                }
+                else {
+                    label.innerHTML += ", ";
+                }
+                label.id = "cons" + constructorsDisabled[i];
+                labelTotalRacesCons.appendChild(label);
+                document.getElementById(label.id).onmouseover = function() {
+                    var thisID = this.id.substring(4, this.id.length)
+                    document.getElementById(thisID).style.textDecoration = "underline overline";
+                    this.style.textDecoration = "underline overline";
+                    d3.selectAll(".rect" + thisID)
+                        .attr("stroke", "black");
+                    d3.selectAll(".text" + thisID)
+                        .attr("text-decoration", "underline overline");     
+                }
+                document.getElementById(label.id).onmouseout = function() {
+                    var thisID = this.id.substring(4, this.id.length)
+                    document.getElementById(thisID).style.textDecoration = "none";
+                    this.style.textDecoration = "none";
+                    d3.selectAll(".rect" + thisID)
+                        .attr("stroke", "none");
+                    d3.selectAll(".text" + thisID)
+                        .attr("text-decoration", "none");  
+                }
+                document.getElementById(label.id).onclick = function() {
+                    var thisID = this.id.substring(4, this.id.length);
+                    onClickConstructor(thisID, data, data2);
+                }          
+            }
+        }
     }
     
     // Prepares the layout for the chart that displays the PCA
@@ -2017,7 +1962,7 @@
             .append('svg')
                 .attr("width", legend_width)
                 .attr("height", small_container_dimensions.height-30)
-                .attr("class", ".svgSim")
+                .attr("class", "svgSim")
                 //.style("background-color", "red")
                 .append("g")
                     .attr("transform", "translate(" + 0 + "," + margins.top/4 + ")")
@@ -2251,59 +2196,38 @@
                 })
                 .style("opacity", 0)
                 .style("stroke", "black");
-        
+                
         circles
             .transition()
                 .duration(animationsSpeed)
                 .style("opacity", 1);
         
+        // Place the point of the selected driver again on the graph, so that it stands out
+        if (PCAmode == 0) {
+            simSvg
+                .append("circle")
+                    .attr("class", selectedDriver)
+                    .attr("cx", pca1Scale(pca1))
+                    .attr("cy", pca2Scale(pca2))
+                    .attr("r", 6)
+                    .style("fill", colorsTeammates(selectedDriver))
+                    .style("stroke", "black")
+                    .on("mouseover", function() {
+                        onMouseOverDriver(selectedDriver);
+                    })
+                    .on("mouseout", function() {
+                        onMouseOutDriver(selectedDriver);
+                    });   
+        } 
+        
+        // Interactions
         circles.on("mouseover", function(d) {
-            // Highligths circle and update stats
-            if (d3.select(this).attr("r") == 6) {
-                d3.select(this).attr("r", 8);
-            }
-            else {
-                d3.select(this).attr("r", 5);
-            }
-            var currentDriverAchievements = [];
-            for (i = 0; i < achievements.length; i++) {
-                if (achievements[i].driver == d.driver) {
-                    currentDriverAchievements = achievements[i];
-                }
-            }
-            labelAchievements.innerHTML = "<b>"+d.driver.replace(/_/g, ' ')+"</b><br>";
-            labelAchievements.innerHTML += "Points: " + currentDriverAchievements.points + " - Starts: " + currentDriverAchievements.starts + " - Finishes: " + currentDriverAchievements.finishes + " - Podiums: " + currentDriverAchievements.podiums + "<br>";
-            labelAchievements.innerHTML += "Wins: " + currentDriverAchievements.wins + " - Poles: " + currentDriverAchievements.poles + " - Championships " + currentDriverAchievements.championships;
-            
-            // Highlights the right bars in the teammate chart
-            if (d.driver == selectedDriver) {
-                cmpSvg.selectAll("[class^=rect0]")
-                    .style("stroke", "black");
-            }
-            else {
-                cmpSvg.selectAll("[class^=rect0][class$=" + d.driver + "]")
-                    .style("stroke", "black");
-                cmpSvg.selectAll("[class^=rect1][class$=" + d.driver + "]")
-                    .style("stroke", "black");
-            }
+            onMouseOverDriver(d.driver);
         });
         
         circles.on("mouseout", function(d) {
-            // Restores everything
-            if (d3.select(this).attr("r") == 8) {
-                d3.select(this).attr("r", 6);
-            }
-            else {
-                d3.select(this).attr("r", 3);
-            }
-            labelAchievements.innerHTML = "<b>No Driver Highlighted</b><br>";
-            labelAchievements.innerHTML += "Points: ? - Starts: ? - Finishes: ? - Podiums: ? <br>";
-            labelAchievements.innerHTML += "Wins: ? - Poles: ? - Championships ?";
-            
-            // Restores everything in the teammate chart
-            cmpSvg.selectAll("[class^=rect]")
-                .style("stroke", "white");
-        });
+            onMouseOutDriver(d.driver);
+        }); 
         
         // Draws the legend
         plotPCALegend(data, data2, notableDrivers);
@@ -2320,8 +2244,11 @@
             .text("Click to filter data!");
         
          // Resize the legend if there too many entries
-        if (teammates.length > 11) {
-            d3.select(".svgSim").attr("height", (teammates.length*sizeSquare*1.5)+10);
+        if (notableDrivers.length > 11) {
+            d3.select(".svgSim").attr("height", (notableDrivers.length*sizeSquare*1.5)+10);
+        }
+        else {
+            d3.select(".svgSim").attr("height", small_container_dimensions.height-30);
         }
         
         // Prepares the space/layout for the legend
@@ -2374,134 +2301,220 @@
         // Add input events to the legend
         legend
             .on("mouseover", function(d) {
+                if (d == "Other") {
+                    return;
+                } 
                 document.body.style.cursor = "pointer";
-                // Highlights the entry in the legend and outlines the right bars
+                onMouseOverDriver(d);
+            })
+            .on("mouseout", function(d) {
                 if (d == "Other") {
                     return;
                 }
-                d3.selectAll(".rect"+d)
-                    .attr("stroke", "black");
-                d3.selectAll(".text"+d)
-                    .attr("text-decoration", "underline overline");    
-                    
-                simSvg.select("."+d)
-                        .attr("r", 8);
-                currentDriverAchievements = [];
-                for (i = 0; i < achievements.length; i++) {
-                    if (achievements[i].driver == d) {
-                        currentDriverAchievements = achievements[i];
-                    }
-                }
-                labelAchievements.innerHTML = "<b>"+d.replace(/_/g, ' ')+"</b><br>";
-                labelAchievements.innerHTML += "Points: " + currentDriverAchievements.points + " - Starts: " + currentDriverAchievements.starts + " - Finishes: " + currentDriverAchievements.finishes + " - Podiums: " + currentDriverAchievements.podiums + "<br>";
-                labelAchievements.innerHTML += "Wins: " + currentDriverAchievements.wins + " - Poles: " + currentDriverAchievements.poles + " - Championships " + currentDriverAchievements.championships;
-                
-                // Highlights the right bars in the teammate chart
-                if (d == selectedDriver) {
-                    cmpSvg.selectAll("[class^=rect0]")
-                        .style("stroke", "black");
-                }
-                else {
-                    cmpSvg.selectAll("[class^=rect0][class$=" + d + "]")
-                        .style("stroke", "black");
-                    cmpSvg.selectAll("[class^=rect1][class$=" + d + "]")
-                        .style("stroke", "black");
-                }
-            })
-            .on("mouseout", function(d) {
                 document.body.style.cursor = "default";
-                // Restores everything
-                d3.selectAll(".rect"+d)
-                    .attr("stroke", "none");
-                d3.selectAll(".text"+d)
-                    .attr("text-decoration", "none");
-                simSvg.select("."+d)
-                    .attr("r", 6);
-                labelAchievements.innerHTML = "<b>No Driver Highlighted</b><br>";
-                labelAchievements.innerHTML += "Points: ? - Starts: ? - Finishes: ? - Podiums: ? <br>";
-                labelAchievements.innerHTML += "Wins: ? - Poles: ? - Championships ?";
-                
-                // Restores everything in the teammate chart
-                cmpSvg.selectAll("[class^=rect]")
-                    .style("stroke", "white");
+                onMouseOutDriver(d);
             })
             .on("click", function(d) {
-                if (d == "Other") {
-                        alert("Can't disable all points in the PCA!");
-                        return;
-                }
-                else if (!teammatesDisabled.includes(d) && teammates.includes(d)) {
-                    if (d == selectedDriver) {
-                        alert("Can't filter out the selected driver!");
-                        return;
-                    }
-                    if (teammatesDisabled.length == teammates.length-2) {
-                        alert("Can't filter out all teammates!");
-                        return;
-                    }
-                    
-                    teammatesDisabled.push(d);
-                    
-                    // Disables the entry in the constructor legend
-                    d3.selectAll(".rect"+d)
-                        .style("fill", "grey");
-                    d3.selectAll(".text"+d)
-                        .style("fill", "grey");
-                }
-                else if (teammates.includes(d)) {
-                    var index = teammatesDisabled.indexOf(d);
-                    teammatesDisabled.splice(index, 1);
-                    lastTeammateEnabled = d;
-                    
-                    // Restores the entry in the legend
-                    d3.selectAll(".rect"+d)
-                        .style("fill", colorsTeammates(d));
-                    d3.selectAll(".text"+d)
-                        .style("fill", "black");
-                }
-                else if (!driversDisabled.includes(d)) {
-                    driversDisabled.push(d);
-                    
-                    // Disables the entry in the constructor legend
-                    d3.selectAll(".rect"+d)
-                        .style("fill", "grey");
-                    d3.selectAll(".text"+d)
-                        .style("fill", "grey");
-                }
-                else {
-                    var index = driversDisabled.indexOf(d);
-                    driversDisabled.splice(index, 1);
-                    
-                    // Restores the entry in the legend
-                    d3.selectAll(".rect"+d)
-                        .style("fill", colorsTeammates(d));
-                    d3.selectAll(".text"+d)
-                        .style("fill", "black");
-                }
- 
-                if (teammates.includes(d)) {
-                    var lastConstructorsDisabledSize = constructorsDisabled.length;
-                    plotComparisons(data, data2);
-                    plotPCA(data, data2);
-                    if (constructorsDisabled.length != lastConstructorsDisabledSize) {
-                        plotPointsAchieved(data, data2);
-                        maxValueDNF = 0;
-                        minYearSelectedDNF = minYear;
-                        maxYearSelectedDNF = maxYear;
-                        minYearSelectedCons = minYear;
-                        maxYearSelectedCons = maxYear;
-                        drawDNFTimeSlider(data);
-                        plotDNF(data, minYearSelectedDNF, maxYearSelectedDNF, selectedTrackDNF);
-                        drawConsistencyTimeSlider(data);
-                        plotConsistency(data, minYearSelectedCons, maxYearSelectedCons, selectedTrackCons);
-                    }
-                }
-                else {
-                    plotPCA(data, data2);
-                }
+                onClickDriver(d, data, data2);
             });
     }
     
+    // Actions to take when the user hovers over a driver
+    function onMouseOverDriver(driver) {
+        // Highlights the entries in the legends
+        d3.selectAll(".rect" + driver)
+            .attr("stroke", "black");
+        d3.selectAll(".text" + driver)
+            .attr("text-decoration", "underline overline");
+        
+        // Highligths circle and updates stats
+        if (notableDrivers.includes(driver)) {
+            d3.select("." + driver).attr("r", 8);
+        }
+        else {
+            d3.select("." + driver).attr("r", 5);
+        }
+        var currentDriverAchievements = [];
+        for (i = 0; i < achievements.length; i++) {
+            if (achievements[i].driver == driver) {
+                currentDriverAchievements = achievements[i];
+            }
+        }
+        if (allDrivers.includes(driver)) {
+            labelAchievements.innerHTML = "<b> "+ driver.replace(/_/g, ' ') + "</b><br>";
+            labelAchievements.innerHTML += "Points: " + currentDriverAchievements.points + " - Starts: " + currentDriverAchievements.starts + " - Finishes: " + currentDriverAchievements.finishes + " - Podiums: " + currentDriverAchievements.podiums + "<br>";
+            labelAchievements.innerHTML += "Wins: " + currentDriverAchievements.wins + " - Poles: " + currentDriverAchievements.poles + " - Championships " + currentDriverAchievements.championships;
+        }
+        
+        // Highlights the right bars in the teammate chart
+        if (driver == selectedDriver) {
+            cmpSvg.selectAll("[class^=rect0]")
+                .style("stroke", "black");
+        }
+        else {
+            cmpSvg.selectAll("[class^=rect0][class$=" + driver + "]")
+                .style("stroke", "black");
+            cmpSvg.selectAll("[class^=rect1][class$=" + driver + "]")
+                .style("stroke", "black");
+        }
+    }
+    
+    // Actions to take when the user stops hovering over a driver
+    function onMouseOutDriver(driver) {      
+        // Restores the entries in the legend
+        d3.selectAll(".rect"+ driver)
+            .attr("stroke", "none");
+        d3.selectAll(".text" + driver)
+            .attr("text-decoration", "none");
+            
+        // Restores everything in the PCA chart
+        if (notableDrivers.includes(driver)) {
+            d3.select("." + driver).attr("r", 6);
+        }
+        else {
+            d3.select("." + driver).attr("r", 3);
+        }
+        labelAchievements.innerHTML = "<b>No Driver Highlighted</b><br>";
+        labelAchievements.innerHTML += "Points: ? - Starts: ? - Finishes: ? - Podiums: ? <br>";
+        labelAchievements.innerHTML += "Wins: ? - Poles: ? - Championships ?";
+            
+        // Restores everything in the teammate chart
+        cmpSvg.selectAll("[class^=rect]")
+            .style("stroke", "white");
+    }
+    
+    // Actions to take when the user clicks a constructor
+    function onClickConstructor(driver, data, data2) {
+        // Hides the data regarding that constructor in all the charts
+        if (!constructorsDisabled.includes(driver)) {
+            if (constructorsDisabled.length == constructors.length-1) {
+                alert("Can't remove all constructors!");
+                return;
+            }
+            if ((driversHovered.length + teammatesDisabled.length) == teammates.length-1) {
+                alert("Removing this constructor may remove all teammates!");
+                return;
+            }
+            constructorsDisabled.push(driver);
+                    
+            // Disables the entry in the constructor legend
+            d3.select(".rect" + driver)
+                .style("fill", "grey");
+            d3.select(".text" + driver)
+                .style("fill", "grey");  
+            }
+            
+        // Restores the data regarding that constructor in all the charts
+       else {
+            var index = constructorsDisabled.indexOf(driver);
+            constructorsDisabled.splice(index, 1);
+            lastConstructorEnabled = driver;
+                    
+            // Restores the entry in the legend
+            d3.select(".rect" + driver)
+                .style("fill", colors(driver));
+            d3.select(".text" + driver)
+                .style("fill", "black");
+            }
+                
+        // Refresh the data in the charts
+        plotPointsAchieved(data, data2);
+        plotComparisons(data, data2);
+        maxValueDNF = 0;
+        minYearSelectedDNF = minYear;
+        maxYearSelectedDNF = maxYear;
+        minYearSelectedCons = minYear;
+        maxYearSelectedCons = maxYear;
+        drawDNFTimeSlider(data, data2);
+        plotDNF(data, data2, minYearSelectedDNF, maxYearSelectedDNF, selectedTrackDNF);
+        drawConsistencyTimeSlider(data, data2);
+        plotConsistency(data, data2, minYearSelectedCons, maxYearSelectedCons, selectedTrackCons);
+        plotPCA(data, data2);
+    }
+    
+    // Actions to take when the user clicks on a driver
+    function onClickDriver(driver, data, data2) {
+        if (driver == "Other") {
+            alert("Can't disable all points in the PCA!");
+            return;
+        }
+        // Deactivate teammate
+        else if (!teammatesDisabled.includes(driver) && teammates.includes(driver)) {
+            // Check it is possibile to filter out the driver
+            if (driver == selectedDriver) {
+                alert("Can't filter out the selected driver!");
+                return;
+            }
+            if (teammatesDisabled.length == teammates.length-2) {
+                alert("Can't filter out all teammates!");
+                return;
+            }
+       
+            teammatesDisabled.push(driver);
+                    
+            // Disables the entry in the constructor legend
+            d3.selectAll(".rect" + driver)
+                .style("fill", "grey");
+            d3.selectAll(".text" + driver)
+                .style("fill", "grey");
+        }
+        // Reactivate teamamte
+        else if (teammates.includes(driver)) {
+            var index = teammatesDisabled.indexOf(driver);
+            teammatesDisabled.splice(index, 1);
+            lastTeammateEnabled = driver;
+                    
+            // Restores the entry in the legend
+            d3.selectAll(".rect" + driver)
+                .style("fill", colorsTeammates(driver));
+            d3.selectAll(".text" + driver)
+                .style("fill", "black");
+        }
+        // Deactivate a driver that is not teammate
+        else if (!driversDisabled.includes(driver)) {
+            driversDisabled.push(driver);
+                    
+            // Disables the entry in the constructor legend
+            d3.selectAll(".rect" + driver)
+                .style("fill", "grey");
+            d3.selectAll(".text"+driver)
+                .style("fill", "grey");
+        }
+        // Reactivate a driver that is a teammate
+        else {
+            var index = driversDisabled.indexOf(driver);
+            driversDisabled.splice(index, 1);
+                    
+            // Restores the entry in the legend
+            d3.selectAll(".rect" + driver)
+                .style("fill", colorsTeammates(driver));
+            d3.selectAll(".text" + driver)
+                .style("fill", "black");
+        }
+        
+        // Redraws the data
+        if (teammates.includes(driver)) {
+            var lastConstructorsDisabledSize = constructorsDisabled.length;
+            plotComparisons(data, data2);
+            plotPCA(data, data2);
+            if (constructorsDisabled.length != lastConstructorsDisabledSize) {
+                plotPointsAchieved(data, data2);
+                maxValueDNF = 0;
+                minYearSelectedDNF = minYear;
+                maxYearSelectedDNF = maxYear;
+                minYearSelectedCons = minYear;
+                maxYearSelectedCons = maxYear;
+                drawDNFTimeSlider(data, data2);
+                plotDNF(data, data2, minYearSelectedDNF, maxYearSelectedDNF, selectedTrackDNF);
+                drawConsistencyTimeSlider(data, data2);
+                plotConsistency(data, data2, minYearSelectedCons, maxYearSelectedCons, selectedTrackCons);
+            }
+        }
+        else {
+            plotPCA(data, data2);
+        }
+    }
+      
     // Adds the list of tracks to a selection
     function addCircuitsToSelection(selection) {
         // Reorder the circuits
