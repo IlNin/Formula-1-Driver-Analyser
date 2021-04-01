@@ -34,8 +34,8 @@
     var driversTimeSliderSvg;
     var barSvg, svgLegend;
     var cmpSvg, svgCmpLegend;
-    var dnfTimeSliderSvg, dnfSvg, labelTotalRacesDNF;
-    var consTimeSliderSvg, consSvg, labelTotalRacesCons;
+    var dnfTimeSliderSvg, dnfSvg, labelConstructorsDNF, labelTotalRacesDNF;
+    var consTimeSliderSvg, consSvg, labelConstructorsCons, labelTotalRacesCons;
     var simSvg, svgSimLegend, labelAchievements;
     
     // Colors
@@ -488,6 +488,7 @@
         document.body.append(wrapper);
         
         // Prepares all the layouts in the middle wrapper
+        colors(selectedDriver);
         preparePointsAchieved(data, data2);    
         prepareComparisons(data, data2);
         
@@ -1246,10 +1247,10 @@
                         })
                         .style("fill", function(d) {
                             if (j == 0) {
-                                return colorsTeammates(selectedDriver);
+                                return colors(selectedDriver);
                             }
                             else {
-                                return colorsTeammates(teammate);
+                                return colors(teammate);
                             }
                         })
                         .style("stroke", "white")
@@ -1307,7 +1308,7 @@
                             text = "[Points against ";
                         }
                         text += teammate.replace(/_/g, ' ') + ": " + d.selectedDriverWins + "] ";
-                        color = colorsTeammates(selectedDriver);
+                        color = colors(selectedDriver);
                     }
                     else {
                         if (compMode != 2) {
@@ -1317,7 +1318,7 @@
                             text = "[Points won by ";
                         }
                         text += teammate.replace(/_/g, ' ') + ": " + d.teammateWins + "] ";
-                        color = colorsTeammates(teammate);
+                        color = colors(teammate);
                     }
                     drawOnMouseOverLabel(coords, cmpSvg, text, color, year, xComp.domain()[0], xComp.domain()[xComp.domain().length-1]);
                 });
@@ -1400,7 +1401,7 @@
             })
 			.style("fill", function(d){
                 if (!teammatesDisabled.includes(d)) {
-                    return colorsTeammates(d);
+                    return colors(d);
                 }
                 return "grey";
 			});
@@ -1498,6 +1499,13 @@
             plotDNF(data, data2, minYearSelectedDNF, maxYearSelectedDNF, selectedTrackDNF);
         }
         
+        // Adds the label with the filtered out constructors
+        labelConstructorsDNF = document.createElement('label');
+        labelConstructorsDNF.style.fontSize = "14px";
+        labelConstructorsDNF.style.color = "red";
+        labelConstructorsDNF.innerHTML = "<br>";
+        svgDNFDiv.appendChild(labelConstructorsDNF);
+        
         // Initalizes an empty svg for the lollipop chart
         dnfSvg = d3.select('#dnf')
             .append('svg')
@@ -1510,7 +1518,7 @@
         
         // Text under the lollipop graph
         var textDiv = document.createElement('div');
-        svgDNFDiv.appendChild(textDiv);
+        svgDNFDiv.appendChild(textDiv); 
         labelTotalRacesDNF = document.createElement('label');
         labelTotalRacesDNF.style.fontSize = "14px";
         labelTotalRacesDNF.innerHTML = "Number of finishes: ";
@@ -1661,6 +1669,14 @@
                 .remove();
         });
         
+        // Changes the font size of the Collision Dmg category
+        dnfSvg.selectAll('text')
+            .attr("font-size", function() {
+                if (this.innerHTML == "Collision Dmg") {
+                    return 9;
+                }
+        });
+                   
         // Adds the stats under the graph
         finishesRatio = (relevantDataDNF[1].value*100)/relevantDataDNF[0].value;
         labelTotalRacesDNF.innerHTML = "<b>Finishes</b>: " + relevantDataDNF[1].value + " (" + finishesRatio.toFixed(2) + "%)";
@@ -1670,18 +1686,19 @@
         
         // Prints the removed constructors
         if (constructorsDisabled.length > 0) {
-            labelTotalRacesDNF.innerHTML += "Constructors filtered out: [";
+            labelConstructorsDNF.innerHTML = "<img src='warning.png' width='14' height='14'/>&nbsp";
+            labelConstructorsDNF.innerHTML += "Constructors filtered out: [";
             for (i = 0; i < constructorsDisabled.length; i++) {
                 var label = document.createElement('label');
                 label.innerHTML = constructorsDisabled[i].replace(/_/g, ' ');
                 if (i == constructorsDisabled.length-1) {
-                    label.innerHTML += "]";
+                    label.innerHTML += "]<br>";
                 }
                 else {
                     label.innerHTML += ", ";
                 }
                 label.id = constructorsDisabled[i];
-                labelTotalRacesDNF.appendChild(label);
+                labelConstructorsDNF.appendChild(label);
                 document.getElementById(label.id).onmouseover = function() {
                     document.body.style.cursor = "pointer";
                     this.style.textDecoration = "underline overline";
@@ -1705,6 +1722,9 @@
                     onClickConstructor(this.id, data, data2);
                 }          
             }
+        }
+        else {
+            labelConstructorsDNF.innerHTML = "<br>";
         }
     }
     
@@ -1749,6 +1769,13 @@
             selectedTrackCons = this.value;
             plotConsistency(data, data2, minYearSelectedCons, maxYearSelectedCons, selectedTrackCons);
         }
+        
+        // Adds the label with the filtered out constructors
+        labelConstructorsCons = document.createElement('label');
+        labelConstructorsCons.style.fontSize = "14px";
+        labelConstructorsCons.style.color = "red";
+        labelConstructorsCons.innerHTML = "<br>";
+        svgConsDiv.appendChild(labelConstructorsCons);
         
         // Initalizes an empty svg for box plot
         consSvg = d3.select('#consistency')
@@ -1986,7 +2013,8 @@
         
         // Prints the removed constructors
         if (constructorsDisabled.length > 0) {
-            labelTotalRacesCons.innerHTML += "Constructors filtered out: [";
+            labelConstructorsCons.innerHTML = "<img src='warning.png' width='14' height='14'/>&nbsp";
+            labelConstructorsCons.innerHTML += "Constructors filtered out: [";
             for (i = 0; i < constructorsDisabled.length; i++) {
                 var label = document.createElement('label');
                 label.innerHTML = constructorsDisabled[i].replace(/_/g, ' ');
@@ -1997,7 +2025,7 @@
                     label.innerHTML += ", ";
                 }
                 label.id = "cons" + constructorsDisabled[i];
-                labelTotalRacesCons.appendChild(label);
+                labelConstructorsCons.appendChild(label);
                 document.getElementById(label.id).onmouseover = function() {
                     document.body.style.cursor = "pointer";
                     var thisID = this.id.substring(4, this.id.length)
@@ -2024,6 +2052,9 @@
                     onClickConstructor(thisID, data, data2);
                 }          
             }
+        }
+        else {
+            labelConstructorsCons.innerHTML = "<br>";
         }
     }
     
@@ -2304,7 +2335,7 @@
                     if (!notableDrivers.includes(d.driver)) {  
                         return "orange";
                     }
-                    return colorsTeammates(d.driver);
+                    return colors(d.driver);
                 })
                 .style("opacity", 0)
                 .style("stroke", "black");
@@ -2322,7 +2353,7 @@
                     .attr("cx", pca1Scale(pca1))
                     .attr("cy", pca2Scale(pca2))
                     .attr("r", 6)
-                    .style("fill", colorsTeammates(selectedDriver))
+                    .style("fill", colors(selectedDriver))
                     .style("stroke", "black")
                     .on("mouseover", function() {
                         onMouseOverDriver(selectedDriver);
@@ -2409,7 +2440,7 @@
                 if (teammatesDisabled.includes(d) || driversDisabled.includes(d)) {
                     return "grey";
                 }
-                return colorsTeammates(d);
+                return colors(d);
 			});
             
         // Writes the text near the small colored rectangles
@@ -2616,7 +2647,7 @@
                     
             // Restores the entry in the legend
             d3.selectAll(".rect" + driver)
-                .style("fill", colorsTeammates(driver));
+                .style("fill", colors(driver));
             d3.selectAll(".text" + driver)
                 .style("fill", "black");
         }
@@ -2637,7 +2668,7 @@
                     
             // Restores the entry in the legend
             d3.selectAll(".rect" + driver)
-                .style("fill", colorsTeammates(driver));
+                .style("fill", colors(driver));
             d3.selectAll(".text" + driver)
                 .style("fill", "black");
         }
@@ -2751,7 +2782,7 @@
         }
         else if (index == 3) {
             about.innerHTML = "<b>- DNFs' CAUSES -</b><br>";
-            about.innerHTML += "This lollipop chart shows the causes of DNFs. '<b>Damage</b>' includes cases of external damage to the car (tyre punctures, broken wings etc.), while '<b>Reliability</b>' includes issues to the internal components (power loss, engine on fire etc.).<br>"; 
+            about.innerHTML += "This lollipop chart shows the causes of DNFs. '<b>Collision Dmg</b>' includes cases of external damage to the car (tyre punctures, broken wings etc.), while '<b>Reliability</b>' includes issues to the internal components (power loss, engine on fire etc.).<br>"; 
             about.innerHTML += "<b>Interactions</b>: Using the time slider and selecting circuits to focus on a part of the data."
         }
         else if (index == 4) {
@@ -3077,7 +3108,7 @@
         relevantResults.push(tuple);
         tuple = {key: "Retirement", value: retiredTotal};
         relevantResults.push(tuple);
-        tuple = {key: "Damage", value: physicalTotal};
+        tuple = {key: "Collision Dmg", value: physicalTotal};
         relevantResults.push(tuple);
         tuple = {key: "Reliability", value: mechanicalTotal};
         relevantResults.push(tuple);
