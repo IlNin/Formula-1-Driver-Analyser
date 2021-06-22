@@ -10,7 +10,7 @@ A JavaScript web application that uses the D3.js library to create a visual envi
 
 <b>Comments:</b><br/>
 After my previous work where I successfully used Data Integration techniques to build a huge database of Formula 1 statistics (https://github.com/IlNin/Formula-1-Data-Management-Project), I just couldn't let those juicy stats go to waste.<br/>
-So for my Visual Analytics project I decided to create an application that could showcase my integrated data in a way that a user can easily interact with it and gain some insights from the drivers they are interested in. Thankfully my professor was a huge Formula 1 fan as well, so he could give a lot of well thought suggestions that helped me to focus on the right areas when working on this project, and for that I thank him so much!<br/>
+So for my Visual Analytics project I decided to create an application that could showcase my integrated data so that a user can easily interact with it and gain some insights from the drivers they are interested in. Thankfully my professor was a huge Formula 1 fan as well, so he could give a lot of well thought suggestions that helped me to focus on the right areas when working on this project, and for that I thank him so much!<br/>
 If you want to know the technical details, you can read my "scientific paper-like" report in the homonymous folder.<br/>
 
 
