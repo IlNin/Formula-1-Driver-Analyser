@@ -104,7 +104,7 @@
         title.id = "title";
         if (showTitleImage) {
             var image = document.createElement("img");
-            image.setAttribute("src", "Logo3B.png");
+            image.setAttribute("src", "Assets/Logo.png");
             image.setAttribute("height", "76px");
             image.setAttribute("width", "445px");
             title.appendChild(image);
@@ -168,9 +168,9 @@
     // Loads the data from the csv file
     function loadData() {
         d3.queue()
-            .defer(d3.csv, "results.csv")
-            .defer(d3.csv, "qualifying.csv")
-            .defer(d3.csv, "driverStandings.csv")
+            .defer(d3.csv, "Data/results.csv")
+            .defer(d3.csv, "Data/qualifying.csv")
+            .defer(d3.csv, "Data/driverStandings.csv")
             .await(function(error, data, data2, data3) {
                 // Prints the error in case something goes wrong
                 if (error) {
@@ -1380,7 +1380,7 @@
                 return "translate(0,"+((i+1)*sizeSquare+i*5)+")";
             })
             .append("svg:image")
-            .attr("xlink:href", "find2.png")
+            .attr("xlink:href", "Assets/find.png")
             .attr("width", sizeSquare+4)
 			.attr("height", sizeSquare+4)
             .attr("y", -2)
@@ -1686,7 +1686,7 @@
         
         // Prints the removed constructors
         if (constructorsDisabled.length > 0) {
-            labelConstructorsDNF.innerHTML = "<img src='warning.png' width='14' height='14'/>&nbsp";
+            labelConstructorsDNF.innerHTML = "<img src='Assets/warning.png' width='14' height='14'/>&nbsp";
             labelConstructorsDNF.innerHTML += "Constructors filtered out: [";
             for (i = 0; i < constructorsDisabled.length; i++) {
                 var label = document.createElement('label');
@@ -2013,7 +2013,7 @@
         
         // Prints the removed constructors
         if (constructorsDisabled.length > 0) {
-            labelConstructorsCons.innerHTML = "<img src='warning.png' width='14' height='14'/>&nbsp";
+            labelConstructorsCons.innerHTML = "<img src='Assets/warning.png' width='14' height='14'/>&nbsp";
             labelConstructorsCons.innerHTML += "Constructors filtered out: [";
             for (i = 0; i < constructorsDisabled.length; i++) {
                 var label = document.createElement('label');
@@ -2414,7 +2414,7 @@
                 return "translate(0,"+((i+1)*sizeSquare+i*5)+")";
             })
             .append("svg:image")
-            .attr("xlink:href", "find2.png")
+            .attr("xlink:href", "Assets/find.png")
             .attr("width", sizeSquare+4)
 			.attr("height", sizeSquare+4)
             .attr("y", -2)
